@@ -14,22 +14,28 @@ from services.direction_predictor import save_models
 logger = logging.getLogger(__name__)
 
 
-def _build_estimators():
+def _build_estimators(scale_pos_weight: float = 1.0):
     """규제 강한 모델들로 앙상블 구성 (과적합 방지 → 일반화 우선).
 
     실험 결과 기존 RF+XGB(깊은 트리)는 노이즈를 외워 테스트 성능이 동전보다
     낮았다. 규제를 강하게 준 트리 + 로지스틱 회귀 앙상블이 일반화가 가장 좋다.
+
+    class_weight='balanced' / scale_pos_weight 로 학습기 하락편향(상승<50%)을
+    보정해 예측 확률이 한쪽(매도)으로 쏠리는 현상을 줄인다.
     """
     estimators = []
-    estimators.append(("logit", LogisticRegression(C=0.3, max_iter=1000)))
+    estimators.append(("logit", LogisticRegression(
+        C=0.3, max_iter=1000, class_weight="balanced")))
     estimators.append(("rf", RandomForestClassifier(
         n_estimators=400, max_depth=5, min_samples_leaf=30,
-        max_features="sqrt", random_state=42, n_jobs=-1)))
+        max_features="sqrt", random_state=42, n_jobs=-1,
+        class_weight="balanced")))
     try:
         from xgboost import XGBClassifier
         estimators.append(("xgb", XGBClassifier(
             n_estimators=300, max_depth=3, learning_rate=0.02,
             subsample=0.8, colsample_bytree=0.8, reg_lambda=2.0,
+            scale_pos_weight=scale_pos_weight,
             eval_metric="logloss", random_state=42)))
     except ImportError:
         logger.warning("xgboost 미설치 → logit+rf 만 사용")
@@ -57,8 +63,10 @@ def train(ticker_code: str, df: pd.DataFrame, config: dict = None) -> dict:
     X_train_s = scaler.fit_transform(X_train)
     X_test_s = scaler.transform(X_test)
 
-    # 규제 앙상블 학습
-    estimators = _build_estimators()
+    # 규제 앙상블 학습 (학습기 하락편향 보정: scale_pos_weight = 하락수/상승수)
+    pos = int(y_train.sum()); neg = len(y_train) - pos
+    spw = neg / pos if pos > 0 else 1.0
+    estimators = _build_estimators(scale_pos_weight=spw)
     fitted = []
     for name, est in estimators:
         est.fit(X_train_s, y_train)

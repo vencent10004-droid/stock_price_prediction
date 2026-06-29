@@ -81,11 +81,14 @@ def predict(ticker_code: str, feature_row: pd.Series) -> dict:
 
 
 def _investment_opinion(prob: float) -> str:
-    if prob >= 0.70:
+    # 0.5 중심 대칭 기준 (매수/매도 동등 조건)
+    if prob >= 0.62:
         return "강력매수"
-    elif prob >= 0.60:
+    elif prob >= 0.54:
         return "매수"
-    elif prob >= 0.45:
+    elif prob > 0.46:
         return "중립"
-    else:
+    elif prob > 0.38:
         return "매도"
+    else:
+        return "강력매도"
