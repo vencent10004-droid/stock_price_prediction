@@ -1,0 +1,35 @@
+# ===== 보안: 절대 커밋 금지 =====
+.env
+*.env.local
+stocksense/.env
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ===== 학습된 모델 (재생성: python train.py) =====
+stocksense/models/
+
+# ===== 생성 산출물 =====
+stocksense/reports/
+*.log
+stocksense/server.log
+
+# ===== 로컬 툴링 / 설정 =====
+.claude/
+_bmad/
+{output_folder}/
+
+# ===== OS / 에디터 =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ===== 임시 =====
+*.tmp
+scratchpad/

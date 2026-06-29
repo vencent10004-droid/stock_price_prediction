@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockSense 화면설계서</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; color: #1F2937; background: #F1F5F9;
+         line-height: 1.6; font-size: 14px; }
+  .page { max-width: 980px; margin: 0 auto; background: #fff; padding: 56px 64px; }
+  h1 { font-size: 30px; font-weight: 700; color: #0F172A; margin-bottom: 8px; letter-spacing: -0.5px; }
+  h2 { font-size: 21px; font-weight: 700; color: #1E3A8A; margin: 48px 0 16px;
+       padding-bottom: 8px; border-bottom: 2px solid #1E3A8A; }
+  h3 { font-size: 17px; font-weight: 700; color: #0F172A; margin: 32px 0 12px;
+       padding-left: 10px; border-left: 4px solid #3B82F6; }
+  h4 { font-size: 14px; font-weight: 700; color: #334155; margin: 18px 0 8px; }
+  p { margin-bottom: 10px; }
+  .subtitle { color: #64748B; font-size: 15px; margin-bottom: 4px; }
+  .cover { border-bottom: 3px solid #0F172A; padding-bottom: 28px; margin-bottom: 8px; }
+  .badge { display: inline-block; background: #1E3A8A; color: #fff; font-size: 12px;
+           padding: 3px 12px; border-radius: 20px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 8px; font-size: 13px; }
+  th, td { border: 1px solid #CBD5E1; padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #EFF3F9; color: #1E3A8A; font-weight: 700; }
+  td.c, th.c { text-align: center; white-space: nowrap; }
+  .meta-table th { width: 140px; background: #F8FAFC; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+         background: #3B82F6; color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; white-space: nowrap; }
+  .tag-disp { background: #E0E7FF; color: #3730A3; }
+  .tag-btn  { background: #DCFCE7; color: #166534; }
+  .tag-data { background: #FEF3C7; color: #92400E; }
+  .tag-input{ background: #FCE7F3; color: #9D174D; }
+  .api { font-family: 'Consolas', monospace; background: #0F172A; color: #93C5FD;
+         font-size: 12px; padding: 2px 7px; border-radius: 4px; }
+  .note { background: #F8FAFC; border-left: 4px solid #94A3B8; padding: 10px 14px;
+          font-size: 13px; color: #475569; margin: 10px 0; border-radius: 0 6px 6px 0; }
+
+  /* ====== 화면 목업 (실제 다크 테마 재현) ====== */
+  .mock { background: #0F172A; border-radius: 12px; padding: 18px; color: #E2E8F0;
+          font-size: 12px; position: relative; margin: 14px 0; border: 1px solid #1E293B; }
+  .mk-header { background: #1E3A8A; margin: -18px -18px 16px; padding: 12px 18px; border-radius: 12px 12px 0 0;
+               display: flex; align-items: center; gap: 10px; }
+  .mk-header b { font-size: 15px; color: #fff; }
+  .mk-header s { font-size: 11px; color: #93C5FD; text-decoration: none; }
+  .mk-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+  .mk-tbtn { background: #1E293B; border: 2px solid #334155; border-radius: 8px; padding: 8px 10px; }
+  .mk-tbtn.on { border-color: #3B82F6; background: #1E3A8A; }
+  .mk-tbtn .c { font-size: 10px; color: #64748B; }
+  .mk-tbtn .n { font-weight: 700; font-size: 12px; }
+  .mk-panel { background: #1E293B; border-radius: 10px; padding: 16px; }
+  .mk-prow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .mk-ptitle { font-size: 15px; font-weight: 700; }
+  .mk-acts { display: flex; gap: 6px; }
+  .mk-b { background: #3B82F6; color: #fff; border-radius: 6px; padding: 5px 11px; font-size: 11px; }
+  .mk-b.sm { background: #334155; }
+  .mk-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .mk-tab { padding: 5px 14px; border-radius: 6px; font-size: 11px; background: #0F172A; color: #64748B; border: 1px solid #1E293B; }
+  .mk-tab.on { background: #1E3A8A; color: #93C5FD; border-color: #3B82F6; }
+  .mk-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .mk-card { background: #0F172A; border-radius: 6px; padding: 11px; }
+  .mk-card .l { font-size: 10px; color: #64748B; margin-bottom: 3px; }
+  .mk-card .v { font-size: 16px; font-weight: 700; }
+  .up { color: #EF4444; } .dn { color: #3B82F6; } .gr { color: #22C55E; } .mut { color: #94A3B8; }
+  .mk-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .mk-rcard { background: #0F172A; border-radius: 6px; padding: 11px; }
+  .mk-rcard.bull { border-left: 3px solid #EF4444; } .mk-rcard.bear { border-left: 3px solid #3B82F6; }
+  .mk-sentbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+  .sp { background: #22C55E; } .sn { background: #94A3B8; } .sg { background: #EF4444; }
+  .mk-news { background: #0F172A; border-radius: 4px; border-left: 2px solid #3B82F6; padding: 6px 9px; margin-bottom: 4px; font-size: 11px; color: #CBD5E1; }
+  .mk-comment { background: #0F172A; border-radius: 6px; padding: 12px; font-size: 11px; color: #CBD5E1; line-height: 1.6; }
+  .mk-badge { display: inline-block; padding: 3px 9px; border-radius: 16px; font-size: 11px; font-weight: 700; background: #1C1917; color: #FED7AA; }
+  .mk-htable { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .mk-htable th { background: #0F172A; padding: 6px 9px; color: #64748B; border: none; text-align: left; }
+  .mk-htable td { padding: 6px 9px; border: none; border-bottom: 1px solid #0F172A; }
+  .pin { position: absolute; width: 20px; height: 20px; background: #F59E0B; color: #0F172A;
+         border-radius: 50%; font-size: 11px; font-weight: 700; display: inline-flex;
+         align-items: center; justify-content: center; box-shadow: 0 0 0 2px #fff; }
+  .legend-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #334155; margin: 10px 0; }
+  .flow-box { background: #EFF3F9; border: 1px solid #3B82F6; border-radius: 6px; padding: 6px 12px; font-weight: 700; color: #1E3A8A; }
+  .flow-arw { color: #94A3B8; font-weight: 700; }
+  ul.spec { margin: 8px 0 8px 20px; } ul.spec li { margin-bottom: 5px; }
+  @media print { body { background: #fff; } .page { padding: 20px; max-width: 100%; } h2 { page-break-after: avoid; } .mock, table { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 표지 -->
+  <div class="cover">
+    <span class="badge">SCREEN DESIGN SPECIFICATION</span>
+    <h1>StockSense 화면설계서</h1>
+    <p class="subtitle">AI 기반 한국 주식 예측 시스템 · 웹 대시보드 UI 설계</p>
+  </div>
+
+  <table class="meta-table">
+    <tr><th>문서명</th><td>StockSense 화면설계서 (Screen Design Specification)</td></tr>
+    <tr><th>프로젝트</th><td>AX 자동화 미니프로젝트 — StockSense</td></tr>
+    <tr><th>버전</th><td>v1.0</td></tr>
+    <tr><th>작성일</th><td>2026-06-29</td></tr>
+    <tr><th>적용 화면</th><td>메인 대시보드, 예측 결과, 백테스트 기록, PDF 리포트 (총 4개)</td></tr>
+    <tr><th>기술 스택</th><td>FastAPI · Jinja2 · Vanilla JS · 다크 테마 반응형 웹</td></tr>
+  </table>
+
+  <!-- 1. 개요 -->
+  <h2>1. 개요</h2>
+  <p>본 문서는 StockSense 웹 대시보드의 화면 구성, 화면별 UI 요소, 사용자 이벤트, 연동 API를 정의한다.
+     모든 화면은 단일 페이지(SPA 형태)로 동작하며, 종목 선택 후 예측·백테스트·리포트 기능을 탭과 버튼으로 제공한다.</p>
+
+  <h3>1.1 화면 흐름</h3>
+  <div class="legend-flow">
+    <span class="flow-box">메인 대시보드</span><span class="flow-arw">→ 종목 선택 →</span>
+    <span class="flow-box">예측 결과</span><span class="flow-arw">↹ 탭 전환 ↹</span>
+    <span class="flow-box">백테스트 기록</span><span class="flow-arw">→ PDF →</span>
+    <span class="flow-box">리포트 다운로드</span>
+  </div>
+
+  <h3>1.2 화면 목록</h3>
+  <table>
+    <thead><tr><th class="c">화면 ID</th><th>화면명</th><th>설명</th><th>연동 API</th></tr></thead>
+    <tbody>
+      <tr><td class="c">SCR-001</td><td>메인 대시보드</td><td>종목 선택 그리드 및 기능 진입 영역</td><td class="c"><span class="api">GET /</span></td></tr>
+      <tr><td class="c">SCR-002</td><td>예측 결과</td><td>내일 주가 방향·신뢰도·가격대·뉴스 감성·코멘트</td><td class="c"><span class="api">GET /api/predict/{code}</span></td></tr>
+      <tr><td class="c">SCR-003</td><td>백테스트 기록</td><td>과거 예측 정확도 및 일자별 적중 내역</td><td class="c"><span class="api">GET /api/history/{code}</span></td></tr>
+      <tr><td class="c">SCR-004</td><td>PDF 리포트</td><td>애널리스트 리포트 PDF 생성·다운로드</td><td class="c"><span class="api">GET /api/report/{code}</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.3 공통 UI 규칙</h3>
+  <ul class="spec">
+    <li>테마: 다크 모드 (배경 <code>#0F172A</code>, 패널 <code>#1E293B</code>, 강조 <code>#3B82F6</code>)</li>
+    <li>색상 의미: <span class="up">빨강 = 상승</span>, <span class="dn">파랑 = 하락</span> (국내 증시 관례 적용)</li>
+    <li>반응형: 종목 그리드·통계 카드는 화면 폭에 따라 자동 줄바꿈 (CSS Grid auto-fill)</li>
+    <li>상단 헤더(로고·부제)는 전 화면 공통 고정</li>
+  </ul>
+
+  <!-- 2. SCR-001 -->
+  <h2>2. SCR-001 · 메인 대시보드</h2>
+  <p>최초 진입 화면. 시가총액 상위 10개 종목 버튼을 표시하며, 종목을 선택하면 하단 기능 패널이 나타난다.</p>
+
+  <div class="mock">
+    <span class="pin" style="top:14px; right:14px;">1</span>
+    <div class="mk-header"><b>📊 StockSense</b><s>AI 기반 한국 주식 예측 시스템</s></div>
+    <div class="mk-grid">
+      <div class="mk-tbtn on"><div class="c">005930</div><div class="n">삼성전자</div></div>
+      <div class="mk-tbtn"><div class="c">000660</div><div class="n">SK하이닉스</div></div>
+      <div class="mk-tbtn"><div class="c">402340</div><div class="n">SK스퀘어</div></div>
+      <div class="mk-tbtn"><div class="c">009150</div><div class="n">삼성전기</div></div>
+      <div class="mk-tbtn"><div class="c">005380</div><div class="n">현대차</div></div>
+    </div>
+    <span class="pin" style="top:96px; left:8px;">2</span>
+    <div class="mk-panel">
+      <div class="mk-prow">
+        <span class="mk-ptitle">삼성전자 (005930)</span>
+        <div class="mk-acts"><span class="mk-b sm">백테스트</span><span class="mk-b sm">📄 PDF</span><span class="mk-b">예측 조회</span></div>
+      </div>
+      <span class="pin" style="bottom:14px; right:14px;">4</span>
+      <div class="mk-tabs"><span class="mk-tab on">예측</span><span class="mk-tab">백테스트 기록</span></div>
+      <div style="color:#64748B; text-align:center; padding:18px;">종목을 선택하고 예측 조회를 누르세요.</div>
+    </div>
+    <span class="pin" style="top:188px; right:60px;">3</span>
+  </div>
+
+  <table>
+    <thead><tr><th class="c">No.</th><th>UI 요소</th><th class="c">유형</th><th>설명 및 이벤트</th></tr></thead>
+    <tbody>
+      <tr><td class="c"><span class="num">1</span></td><td>종목 선택 그리드</td><td class="c"><span class="tag tag-btn">버튼</span></td>
+        <td>config.yaml의 종목 10개를 버튼으로 렌더링. 클릭 시 <code>selectTicker()</code> 실행 → 기능 패널 표시</td></tr>
+      <tr><td class="c"><span class="num">2</span></td><td>종목 버튼</td><td class="c"><span class="tag tag-btn">버튼</span></td>
+        <td>종목코드(상단)·종목명(하단) 표시. 선택된 버튼은 파란 테두리로 강조(active)</td></tr>
+      <tr><td class="c"><span class="num">3</span></td><td>기능 패널</td><td class="c"><span class="tag tag-disp">영역</span></td>
+        <td>종목 선택 전에는 숨김(<code>display:none</code>). 선택 시 노출</td></tr>
+      <tr><td class="c"><span class="num">4</span></td><td>액션 버튼 / 탭</td><td class="c"><span class="tag tag-btn">버튼</span></td>
+        <td>백테스트 · PDF · 예측 조회 버튼 및 [예측 / 백테스트 기록] 탭 전환</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 3. SCR-002 -->
+  <h2>3. SCR-002 · 예측 결과</h2>
+  <p>[예측 조회] 클릭 시 <span class="api">/api/predict/{code}</span> 호출 후 렌더링. 조회 중 "AI 예측 중..." 로딩 표시(10~30초).</p>
+
+  <div class="mock">
+    <span class="pin" style="top:14px; left:8px;">1</span>
+    <div class="mk-stats">
+      <div class="mk-card"><div class="l">내일 방향</div><div class="v up">▲ 상승</div></div>
+      <div class="mk-card"><div class="l">신뢰도</div><div class="v">67.5%</div></div>
+      <div class="mk-card"><div class="l">투자의견</div><div class="v"><span class="mk-badge">매수</span></div></div>
+      <div class="mk-card"><div class="l">현재 종가</div><div class="v">322,000원</div></div>
+      <div class="mk-card"><div class="l">RSI(14)</div><div class="v mut">54.2</div></div>
+      <div class="mk-card"><div class="l">거래량 비율</div><div class="v">1.18x</div></div>
+    </div>
+    <span class="pin" style="top:128px; left:8px;">2</span>
+    <div class="mk-range">
+      <div class="mk-rcard bull"><div class="mut" style="font-size:10px;">▲ 상승 시나리오</div><div class="up" style="font-weight:700; margin-top:4px;">325,000 ~ 338,000원</div><div style="font-size:10px; color:#64748B; margin-top:4px;">저항1: 335,000 / 저항2: 341,000</div></div>
+      <div class="mk-rcard bear"><div class="mut" style="font-size:10px;">▼ 하락 시나리오</div><div class="dn" style="font-weight:700; margin-top:4px;">310,000 ~ 320,000원</div><div style="font-size:10px; color:#64748B; margin-top:4px;">지지1: 312,000 / 지지2: 305,000</div></div>
+    </div>
+    <span class="pin" style="top:222px; left:8px;">3</span>
+    <div style="font-size:11px; color:#64748B; margin-bottom:4px;">뉴스 감성 분석 &nbsp; 0.30 (긍정)</div>
+    <div class="mk-sentbar"><div class="sp" style="width:50%;"></div><div class="sn" style="width:30%;"></div><div class="sg" style="width:20%;"></div></div>
+    <div style="font-size:10px; color:#94A3B8; margin-bottom:8px;">긍5 중3 부2 · 반도체 슈퍼사이클과 AI 투자 기대감이 우세합니다.</div>
+    <span class="pin" style="top:330px; left:8px;">4</span>
+    <div style="font-size:10px; color:#64748B; margin-bottom:4px;">주요 뉴스 헤드라인 (10건)</div>
+    <div class="mk-news">1. 현대차증권 "삼성전자 2분기 영업익 전망 하향…매수 전략 유효" ↗</div>
+    <div class="mk-news">2. '상위 1%'의 선택은 여전히 반도체…SK하이닉스·삼성전자 쓸어담아 ↗</div>
+    <span class="pin" style="bottom:14px; left:8px;">5</span>
+    <div style="font-size:10px; color:#64748B; margin:10px 0 4px;">애널리스트 코멘트</div>
+    <div class="mk-comment">삼성전자의 내일 주가는 67.5% 신뢰도로 상승할 것으로 전망되며, 투자의견은 '매수'입니다. 긍정적인 반도체 업황과 대규모 AI 투자 기대가 핵심 동력으로 분석됩니다. 본 의견은 참고용이며 투자 손실의 책임은 투자자 본인에게 있습니다.</div>
+  </div>
+
+  <table>
+    <thead><tr><th class="c">No.</th><th>UI 요소</th><th class="c">유형</th><th>데이터 항목</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td class="c"><span class="num">1</span></td><td>통계 카드 (6종)</td><td class="c"><span class="tag tag-disp">출력</span></td>
+        <td><code>direction, probability, investment_opinion, close_price, rsi_14, volume_ratio</code></td>
+        <td>내일 방향(▲/▼), 신뢰도(%), 투자의견 배지, 현재 종가, RSI(14), 거래량 비율</td></tr>
+      <tr><td class="c"><span class="num">2</span></td><td>가격대 예측</td><td class="c"><span class="tag tag-disp">출력</span></td>
+        <td><code>bull{low,high,resistance}, bear{low,high,support}</code></td>
+        <td>상승/하락 시나리오별 예상 가격대와 지지·저항선 (피벗 기반)</td></tr>
+      <tr><td class="c"><span class="num">3</span></td><td>뉴스 감성 분석</td><td class="c"><span class="tag tag-data">분석</span></td>
+        <td><code>sentiment{score, positive, neutral, negative, summary}</code></td>
+        <td>Gemini AI가 분석한 감성 점수·라벨, 긍/중/부 막대그래프, 한 줄 요약</td></tr>
+      <tr><td class="c"><span class="num">4</span></td><td>주요 뉴스 헤드라인</td><td class="c"><span class="tag tag-data">목록</span></td>
+        <td><code>headlines[] {title, url}</code></td>
+        <td>회사 관련성 우선 정렬된 뉴스 10건. 클릭 시 새 탭으로 네이버 기사 이동</td></tr>
+      <tr><td class="c"><span class="num">5</span></td><td>애널리스트 코멘트</td><td class="c"><span class="tag tag-data">분석</span></td>
+        <td><code>analyst_comment, generated_at</code></td>
+        <td>예측·지표·감성을 종합한 Gemini 생성 코멘트 (실패 시 규칙 기반 대체)</td></tr>
+    </tbody>
+  </table>
+  <div class="note">투자의견 배지는 값에 따라 색상이 달라진다 — 강력매수/매수(난색), 중립(회색), 매도(한색).</div>
+
+  <!-- 4. SCR-003 -->
+  <h2>4. SCR-003 · 백테스트 기록</h2>
+  <p>[백테스트] 클릭 시 <span class="api">/api/history/{code}</span> 호출. 과거 예측의 적중 여부를 집계·표시한다.</p>
+
+  <div class="mock">
+    <span class="pin" style="top:14px; left:8px;">1</span>
+    <div class="mk-stats">
+      <div class="mk-card"><div class="l">테스트 샘플</div><div class="v">102일</div></div>
+      <div class="mk-card"><div class="l">정답</div><div class="v gr">67일</div></div>
+      <div class="mk-card"><div class="l">정확도</div><div class="v">65.7%</div></div>
+    </div>
+    <span class="pin" style="bottom:14px; left:8px;">2</span>
+    <table class="mk-htable">
+      <thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>정오</th><th>신뢰도</th></tr></thead>
+      <tbody>
+        <tr><td>2026-06-27</td><td class="up">상승</td><td class="up">상승</td><td class="gr">✓</td><td>64.2%</td></tr>
+        <tr><td>2026-06-26</td><td class="dn">하락</td><td class="up">상승</td><td class="sg" style="color:#EF4444;">✗</td><td>58.1%</td></tr>
+        <tr><td>2026-06-25</td><td class="up">상승</td><td class="up">상승</td><td class="gr">✓</td><td>71.5%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <table>
+    <thead><tr><th class="c">No.</th><th>UI 요소</th><th class="c">유형</th><th>데이터 항목</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td class="c"><span class="num">1</span></td><td>요약 카드 (3종)</td><td class="c"><span class="tag tag-disp">출력</span></td>
+        <td><code>total, correct, accuracy</code></td>
+        <td>테스트 샘플 일수, 정답 일수, 정확도(%)</td></tr>
+      <tr><td class="c"><span class="num">2</span></td><td>예측 기록 테이블</td><td class="c"><span class="tag tag-data">목록</span></td>
+        <td><code>records[] {date, predicted, actual, correct, prob}</code></td>
+        <td>일자별 예측/실제 방향, 적중 여부(✓/✗), 신뢰도. 최신순 정렬</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 5. SCR-004 -->
+  <h2>5. SCR-004 · PDF 리포트</h2>
+  <p>[📄 PDF] 버튼 클릭 시 <span class="api">GET /api/report/{code}?generate=true</span>를 호출하여
+     서버에서 애널리스트 리포트 PDF를 생성하고 즉시 다운로드한다.</p>
+
+  <table>
+    <thead><tr><th class="c">No.</th><th>항목</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c"><span class="num">1</span></td><td>트리거</td><td>기능 패널의 [📄 PDF] 버튼 → <code>downloadReport()</code> 실행</td></tr>
+      <tr><td class="c"><span class="num">2</span></td><td>요청</td><td><span class="api">GET /api/report/{code}?generate=true</span></td></tr>
+      <tr><td class="c"><span class="num">3</span></td><td>서버 처리</td><td><code>report_generator</code>가 예측·지표·감성·차트를 종합해 PDF 생성</td></tr>
+      <tr><td class="c"><span class="num">4</span></td><td>응답</td><td>PDF 파일 다운로드. 파일명: <code>{code}_report.pdf</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6. API 요약 -->
+  <h2>6. 연동 API 요약</h2>
+  <table>
+    <thead><tr><th class="c">메서드</th><th>엔드포인트</th><th>화면</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td class="c">GET</td><td><span class="api">/</span></td><td class="c">SCR-001</td><td>대시보드 HTML 렌더링 (종목 목록 주입)</td></tr>
+      <tr><td class="c">GET</td><td><span class="api">/api/predict/{code}</span></td><td class="c">SCR-002</td><td>단일 종목 즉시 예측 (주가·뉴스·감성·코멘트)</td></tr>
+      <tr><td class="c">GET</td><td><span class="api">/api/history/{code}</span></td><td class="c">SCR-003</td><td>백테스트 정확도 및 일자별 기록</td></tr>
+      <tr><td class="c">GET</td><td><span class="api">/api/report/{code}</span></td><td class="c">SCR-004</td><td>PDF 리포트 생성·다운로드</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note" style="margin-top:32px; border-left-color:#1E3A8A;">
+    <b>문서 끝.</b> 본 화면설계서는 StockSense v1.0의 실제 구현(<code>templates/dashboard.html</code>, <code>static/js/app.js</code>, <code>routers/</code>)을 기준으로 작성되었습니다.
+  </div>
+
+</div>
+</body>
+</html>

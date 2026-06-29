@@ -1,0 +1,195 @@
+let currentTicker = null;
+let currentName = null;
+
+function selectTicker(code, name) {
+  currentTicker = code;
+  currentName = name;
+  document.querySelectorAll(".ticker-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("btn-" + code).classList.add("active");
+  document.getElementById("panel-title").textContent = name + " (" + code + ")";
+  document.getElementById("main-panel").style.display = "block";
+  document.getElementById("prediction-content").innerHTML = '<div class="loading">예측 조회 버튼을 눌러주세요.</div>';
+  document.getElementById("history-content").innerHTML = '<div class="loading">백테스트 버튼을 눌러 기록을 불러오세요.</div>';
+  switchTab("prediction");
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t, i) => {
+    const names = ["prediction", "history"];
+    t.classList.toggle("active", names[i] === name);
+  });
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+}
+
+async function loadPrediction() {
+  if (!currentTicker) return;
+  const el = document.getElementById("prediction-content");
+  el.innerHTML = '<div class="loading">AI 예측 중... (10~30초 소요될 수 있습니다)</div>';
+  switchTab("prediction");
+  try {
+    const res = await fetch("/api/predict/" + currentTicker);
+    if (!res.ok) {
+      const err = await res.json();
+      el.innerHTML = '<div class="error">오류: ' + (err.detail || res.status) + '</div>';
+      return;
+    }
+    const d = await res.json();
+    renderPrediction(el, d);
+  } catch (e) {
+    el.innerHTML = '<div class="error">네트워크 오류: ' + e.message + '</div>';
+  }
+}
+
+function renderPrediction(el, d) {
+  const isUp = d.direction === "상승";
+  const dirClass = isUp ? "up" : "down";
+  const arrow = isUp ? "▲" : "▼";
+  const prob = (d.probability * 100).toFixed(1);
+
+  el.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label">내일 방향</div>
+        <div class="value ${dirClass}">${arrow} ${d.direction}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">신뢰도</div>
+        <div class="value">${prob}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">투자의견</div>
+        <div class="value"><span class="opinion-badge opinion-${d.investment_opinion}">${d.investment_opinion}</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">현재 종가</div>
+        <div class="value">${Number(d.close_price).toLocaleString()}원</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">RSI(14)</div>
+        <div class="value ${d.rsi_14 > 70 ? 'up' : d.rsi_14 < 30 ? 'down' : 'neutral'}">${d.rsi_14?.toFixed(1) ?? '-'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">거래량 비율</div>
+        <div class="value">${d.volume_ratio?.toFixed(2) ?? '-'}x</div>
+      </div>
+    </div>
+
+    ${renderPriceRange(d)}
+    ${renderSentiment(d)}
+
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">애널리스트 코멘트</div>
+    <div class="comment-box">${d.analyst_comment || '코멘트 없음'}</div>
+    <div style="font-size:0.75rem;color:#475569">생성: ${d.generated_at?.replace('T', ' ').slice(0,19) ?? ''}</div>
+  `;
+}
+
+function renderPriceRange(d) {
+  const bull = d.bull || {};
+  const bear = d.bear || {};
+  if (!bull.low && !bear.low) return '';
+  return `
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">가격대 예측 (다음 거래일)</div>
+    <div class="price-range" style="margin-bottom:16px">
+      <div class="range-card bull">
+        <h4>▲ 상승 시나리오</h4>
+        <div class="range-val up">${Number(bull.low).toLocaleString()} ~ ${Number(bull.high).toLocaleString()}원</div>
+        <div style="font-size:0.75rem;color:#64748B;margin-top:6px">
+          저항1: ${Number(bull.resistance1||0).toLocaleString()} / 저항2: ${Number(bull.resistance2||0).toLocaleString()}
+        </div>
+      </div>
+      <div class="range-card bear">
+        <h4>▼ 하락 시나리오</h4>
+        <div class="range-val down">${Number(bear.low).toLocaleString()} ~ ${Number(bear.high).toLocaleString()}원</div>
+        <div style="font-size:0.75rem;color:#64748B;margin-top:6px">
+          지지1: ${Number(bear.support1||0).toLocaleString()} / 지지2: ${Number(bear.support2||0).toLocaleString()}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSentiment(d) {
+  const pos = d.sentiment?.positive ?? 0;
+  const neu = d.sentiment?.neutral ?? 0;
+  const neg = d.sentiment?.negative ?? 0;
+  const total = pos + neu + neg || 1;
+  const score = d.sentiment_score ?? 0;
+  const label = score > 0.1 ? '긍정' : score < -0.1 ? '부정' : '중립';
+  return `
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">뉴스 감성 분석</div>
+    <div class="news-sent" style="margin-bottom:8px">
+      <span style="font-size:0.8rem;color:#94A3B8">${score.toFixed(2)} (${label})</span>
+      <div class="sent-bar">
+        <div class="sent-pos" style="width:${pos/total*100}%"></div>
+        <div class="sent-neu" style="width:${neu/total*100}%"></div>
+        <div class="sent-neg" style="width:${neg/total*100}%"></div>
+      </div>
+      <span style="font-size:0.75rem;color:#64748B">긍${pos} 중${neu} 부${neg}</span>
+    </div>
+    <div style="font-size:0.82rem;color:#94A3B8;margin-bottom:12px">${d.sentiment_summary || ''}</div>
+    ${(d.headlines && d.headlines.length > 0) ? `
+    <div style="margin-bottom:6px;font-size:0.8rem;color:#64748B">주요 뉴스 헤드라인 (${d.headlines.length}건)</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${d.headlines.map((h, i) => {
+        const title = (typeof h === 'object' && h !== null) ? h.title : h;
+        const url = (typeof h === 'object' && h !== null) ? h.url : '';
+        const inner = `${i+1}. ${title}`;
+        return url
+          ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem;color:#CBD5E1;padding:5px 8px;background:#1E293B;border-radius:4px;border-left:2px solid #3B82F6;text-decoration:none;display:block;transition:background 0.15s" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1E293B'">${inner} <span style="color:#64748B;font-size:0.7rem">↗</span></a>`
+          : `<div style="font-size:0.78rem;color:#CBD5E1;padding:5px 8px;background:#1E293B;border-radius:4px;border-left:2px solid #3B82F6">${inner}</div>`;
+      }).join('')}
+    </div>` : ''}`;
+}
+
+async function loadHistory() {
+  if (!currentTicker) return;
+  const el = document.getElementById("history-content");
+  el.innerHTML = '<div class="loading">백테스트 데이터 로딩 중...</div>';
+  switchTab("history");
+  try {
+    const res = await fetch("/api/history/" + currentTicker);
+    if (!res.ok) {
+      const err = await res.json();
+      el.innerHTML = '<div class="error">오류: ' + (err.detail || res.status) + '</div>';
+      return;
+    }
+    const d = await res.json();
+    renderHistory(el, d);
+  } catch (e) {
+    el.innerHTML = '<div class="error">네트워크 오류: ' + e.message + '</div>';
+  }
+}
+
+function renderHistory(el, d) {
+  const pct = (d.accuracy * 100).toFixed(1);
+  const rows = (d.records || []).slice().reverse().map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td class="${r.predicted === '상승' ? 'up' : 'down'}">${r.predicted}</td>
+      <td class="${r.actual === '상승' ? 'up' : 'down'}">${r.actual}</td>
+      <td class="${r.correct ? 'correct' : 'wrong'}">${r.correct ? '✓' : '✗'}</td>
+      <td>${(r.prob * 100).toFixed(1)}%</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-card"><div class="label">테스트 샘플</div><div class="value">${d.total}일</div></div>
+      <div class="stat-card"><div class="label">정답</div><div class="value correct">${d.correct}일</div></div>
+      <div class="stat-card"><div class="label">정확도</div><div class="value">${pct}%</div></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="history-table">
+        <thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>정오</th><th>신뢰도</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function downloadReport() {
+  if (!currentTicker) return;
+  const url = "/api/report/" + currentTicker + "?generate=true";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = currentTicker + "_report.pdf";
+  a.click();
+}

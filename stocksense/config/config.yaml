@@ -1,0 +1,53 @@
+# 시가총액 상위 10개 기업 (기준일: 2026-06-26, FinanceDataReader 시총 순)
+# ※ 삼성전자우(우선주)는 삼성전자와 동일 기업이라 제외하고 다음 순위 편입
+tickers:
+  - code: "005930"
+    name: "삼성전자"
+    sector: "반도체/전자"
+  - code: "000660"
+    name: "SK하이닉스"
+    sector: "반도체"
+  - code: "402340"
+    name: "SK스퀘어"
+    sector: "투자지주"
+  - code: "009150"
+    name: "삼성전기"
+    sector: "전자부품"
+  - code: "005380"
+    name: "현대차"
+    sector: "자동차"
+  - code: "373220"
+    name: "LG에너지솔루션"
+    sector: "2차전지"
+  - code: "032830"
+    name: "삼성생명"
+    sector: "보험"
+  - code: "028260"
+    name: "삼성물산"
+    sector: "종합/건설"
+  - code: "207940"
+    name: "삼성바이오로직스"
+    sector: "바이오"
+  - code: "329180"
+    name: "HD현대중공업"
+    sector: "조선"
+
+schedule:
+  daily_run_hour: 16
+  daily_run_minute: 30
+  retrain_day: "sun"
+  retrain_hour: 2
+  retrain_minute: 0
+
+model:
+  lookback_years: 3
+  retrain_period_weeks: 1
+  min_accuracy_threshold: 0.52
+  rf_n_estimators: 200
+  rf_max_depth: 10
+  rf_min_samples_leaf: 5
+
+email:
+  send_report: true
+  retry_on_fail: 2
+  subject_prefix: "[StockSense]"
