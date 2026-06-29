@@ -22,31 +22,35 @@ def _model_path(ticker_code: str):
 
 
 def load_models(ticker_code: str):
+    """반환: (models[list], names[list], scaler, features)"""
     path = _model_path(ticker_code)
-    rf = joblib.load(path / "rf_model.pkl")
     scaler = joblib.load(path / "scaler.pkl")
     features = joblib.load(path / "features.pkl")
+    ens_path = path / "ensemble.pkl"
+    if ens_path.exists():
+        data = joblib.load(ens_path)
+        return data["models"], data["names"], scaler, features
+    # 레거시 호환 (구 rf+xgb 포맷)
+    models, names = [joblib.load(path / "rf_model.pkl")], ["rf"]
     try:
-        from xgboost import XGBClassifier
-        xgb = joblib.load(path / "xgb_model.pkl")
+        models.append(joblib.load(path / "xgb_model.pkl")); names.append("xgb")
     except Exception:
-        xgb = None
-    return rf, xgb, scaler, features
+        pass
+    return models, names, scaler, features
 
 
-def save_models(ticker_code: str, rf, xgb, scaler, features):
+def save_models(ticker_code: str, models, names, scaler, features):
     path = _model_path(ticker_code)
-    joblib.dump(rf, path / "rf_model.pkl")
+    joblib.dump({"models": list(models), "names": list(names)}, path / "ensemble.pkl")
     joblib.dump(scaler, path / "scaler.pkl")
     joblib.dump(features, path / "features.pkl")
-    if xgb is not None:
-        joblib.dump(xgb, path / "xgb_model.pkl")
-    logger.info(f"{ticker_code} 모델 저장 완료: {path}")
+    logger.info(f"{ticker_code} 모델 저장 완료: {path} (앙상블: {names})")
 
 
 def models_exist(ticker_code: str) -> bool:
     path = _model_path(ticker_code)
-    return (path / "rf_model.pkl").exists() and (path / "scaler.pkl").exists()
+    has_model = (path / "ensemble.pkl").exists() or (path / "rf_model.pkl").exists()
+    return has_model and (path / "scaler.pkl").exists()
 
 
 def predict(ticker_code: str, feature_row: pd.Series) -> dict:
@@ -57,25 +61,14 @@ def predict(ticker_code: str, feature_row: pd.Series) -> dict:
     if not models_exist(ticker_code):
         raise FileNotFoundError(f"모델 없음: {ticker_code}. 먼저 train.py를 실행하세요.")
 
-    rf, xgb, scaler, features = load_models(ticker_code)
+    models, names, scaler, features = load_models(ticker_code)
 
-    # 피처 정렬
-    available = [f for f in features if f in feature_row.index]
-    x = feature_row[available].values.reshape(1, -1)
+    # 피처 정렬 (학습 시 사용한 features 순서 그대로)
+    x = feature_row.reindex(features).values.reshape(1, -1).astype(float)
     x_scaled = scaler.transform(x)
 
-    # RF 확률
-    rf_prob = rf.predict_proba(x_scaled)[0][1]
-
-    # XGB 확률 (있으면 앙상블)
-    if xgb is not None:
-        try:
-            xgb_prob = xgb.predict_proba(x_scaled)[0][1]
-            prob = (rf_prob * 0.5 + xgb_prob * 0.5)
-        except Exception:
-            prob = rf_prob
-    else:
-        prob = rf_prob
+    # 앙상블 확률 = 모델 평균
+    prob = float(np.mean([m.predict_proba(x_scaled)[0][1] for m in models]))
 
     direction = "상승" if prob >= 0.5 else "하락"
     opinion = _investment_opinion(prob)

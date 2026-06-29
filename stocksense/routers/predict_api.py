@@ -27,7 +27,7 @@ def predict_ticker(ticker_code: str):
     from services.krx_collector import fetch_investor_data
     from services.news_crawler import fetch_naver_news
     from services.sentiment_analyzer import analyze_sentiment, generate_analyst_comment
-    from services.feature_engine import build_features
+    from services.feature_engine import build_features, latest_flow_signal
     from services.direction_predictor import predict, models_exist
 
     ticker_name = _get_ticker_name(ticker_code, cfg)
@@ -65,6 +65,7 @@ def predict_ticker(ticker_code: str):
             "bear": price_range.get("bear", {}),
             "pivot": price_range.get("pivot", 0),
             "analyst_comment": analyst_comment,
+            "strong_signal": latest_flow_signal(),
             "generated_at": datetime.now().isoformat(),
         }
     except Exception as e:

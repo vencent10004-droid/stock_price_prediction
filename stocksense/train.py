@@ -24,7 +24,7 @@ model_cfg = cfg.get("model", {})
 
 # 특정 종목만 or 전체
 target_codes = sys.argv[1:] if len(sys.argv) > 1 else [t["code"] for t in tickers]
-market_data = fetch_market_data(years=3)
+market_data = fetch_market_data(years=5)
 
 for t in tickers:
     if t["code"] not in target_codes:
@@ -34,7 +34,7 @@ for t in tickers:
     print(f"\n{'='*50}")
     print(f"학습 시작: {name} ({code})")
     print("="*50)
-    stock_df = fetch_stock_data(code, years=3)
+    stock_df = fetch_stock_data(code, years=5)
     investor_df = fetch_investor_data(code, days=750)
     df = build_features(stock_df, market_data, investor_df)
     result = train(code, df, model_cfg)

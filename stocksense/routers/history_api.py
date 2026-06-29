@@ -17,7 +17,7 @@ def get_history(ticker_code: str):
 
     from services.data_collector import fetch_stock_data, fetch_market_data
     from services.krx_collector import fetch_investor_data
-    from services.feature_engine import build_features
+    from services.feature_engine import build_features, flow_signal_map
     from services.model_trainer import backtest
     from services.direction_predictor import models_exist
 
@@ -30,6 +30,10 @@ def get_history(ticker_code: str):
         investor_df = fetch_investor_data(ticker_code, days=750)
         df = build_features(stock_df, market_data, investor_df)
         results = backtest(ticker_code, df)
+        # 신호일(선물+ AND 콜+) 표시
+        sig_map = flow_signal_map()
+        for r in results:
+            r["signal"] = sig_map.get(r["date"], False)
         correct = sum(1 for r in results if r["correct"])
         accuracy = correct / len(results) if results else 0
 
