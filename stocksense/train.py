@@ -36,7 +36,7 @@ for t in tickers:
     print("="*50)
     stock_df = fetch_stock_data(code, years=5)
     investor_df = fetch_investor_data(code, days=750)
-    df = build_features(stock_df, market_data, investor_df)
+    df = build_features(stock_df, market_data, investor_df, ticker_code=code)
     result = train(code, df, model_cfg)
     print(f"정확도: {result['accuracy']*100:.2f}%")
     print(f"학습 샘플: {result['n_train']} | 테스트 샘플: {result['n_test']}")

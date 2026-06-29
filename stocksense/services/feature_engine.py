@@ -37,6 +37,21 @@ def flow_signal_map() -> dict:
     return out
 
 
+def load_stock_flow(ticker_code: str) -> pd.Series | None:
+    """종목별 외국인 현물 순매수 로드 (data/stock_flow_{code}.csv). 없으면 None."""
+    if not ticker_code:
+        return None
+    path = _FOREIGN_CSV.parent / f"stock_flow_{ticker_code}.csv"
+    if not path.exists():
+        return None
+    try:
+        f = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
+        return f["foreign_stock_net"]
+    except Exception as e:
+        logger.warning(f"현물 수급 로드 실패 ({ticker_code}): {e}")
+        return None
+
+
 def latest_flow_signal() -> dict:
     """최신 외국인 선물·콜옵션 순매수 기준 '강한 상승 신호' 판정.
 
@@ -102,7 +117,8 @@ def calc_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14
 
 def build_features(stock_df: pd.DataFrame, market_data: dict = None,
                    investor_df: pd.DataFrame = None,
-                   sentiment_score: float = 0.0) -> pd.DataFrame:
+                   sentiment_score: float = 0.0,
+                   ticker_code: str = None) -> pd.DataFrame:
     """
     stock_df: OHLCV (open, high, low, close, volume)
     market_data: {"kospi": df, "nasdaq": df, "usdkrw": df}
@@ -199,6 +215,17 @@ def build_features(stock_df: pd.DataFrame, market_data: dict = None,
         for col in ["foreign_buy", "call_buy", "fut_call_both"]:
             df[col] = 0
 
+    # ── 외국인 현물 순매수 (종목별 data/stock_flow_{code}.csv) ──
+    sflow = load_stock_flow(ticker_code)
+    if sflow is not None:
+        sa = sflow.reindex(df.index.normalize()).values
+        sstd = np.nanstd(sa) or 1.0
+        df["foreign_stock_z"] = np.nan_to_num(sa / sstd, nan=0.0)
+        df["foreign_stock_buy"] = (np.nan_to_num(sa, nan=0.0) > 0).astype(int)
+    else:
+        df["foreign_stock_z"] = 0.0
+        df["foreign_stock_buy"] = 0
+
     # ── 감성 점수 (당일 고정값) ──
     df["sentiment_score"] = sentiment_score
 
@@ -226,6 +253,8 @@ FEATURE_COLS = [
     "ma_gap", "dow", "hl_range", "up_streak",
     # 외국인 선물 순매수 피처 (검증상 모델 정확도 향상에 기여)
     "foreign_net_z", "foreign_buy", "foreign_net_ma5",
+    # 외국인 현물 순매수 피처 (종목별, 검증상 정확도 향상)
+    "foreign_stock_z", "foreign_stock_buy",
     # ※ 콜옵션(call_net_z/call_buy/fut_call_both)은 held-out 검증에서 개선 없어 모델 제외.
     #    단 "선물+ AND 콜+" 조합은 다음날 상승 72%로, 고신뢰 알림 규칙용으로는 유효.
 ]

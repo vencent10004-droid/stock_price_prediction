@@ -43,7 +43,7 @@ for t in tickers:
     investor_df = fetch_investor_data(code, days=90)
     headlines = fetch_naver_news(code, name, max_articles=5)
     sentiment = analyze_sentiment(name, headlines)
-    df = build_features(stock_df, market_data, investor_df, sentiment["score"])
+    df = build_features(stock_df, market_data, investor_df, sentiment["score"], ticker_code=code)
     latest = df.iloc[-1]
     result = predict(code, latest)
     price_range = estimate_price_range(df)

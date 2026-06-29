@@ -42,7 +42,7 @@ def run_daily_pipeline():
             headlines = fetch_naver_news(code, name, max_articles=10)
             sentiment = analyze_sentiment(name, headlines)
 
-            df = build_features(stock_df, market_data, investor_df, sentiment["score"])
+            df = build_features(stock_df, market_data, investor_df, sentiment["score"], ticker_code=code)
             if not models_exist(code):
                 logger.warning(f"{code} 모델 없음 – 예측 건너뜀")
                 continue
@@ -84,7 +84,7 @@ def run_weekly_retrain():
         try:
             stock_df = fetch_stock_data(code, years=3)
             investor_df = fetch_investor_data(code, days=750)
-            df = build_features(stock_df, market_data, investor_df)
+            df = build_features(stock_df, market_data, investor_df, ticker_code=code)
             result = train(code, df, model_cfg)
             logger.info(f"{name} 재학습 완료 | 정확도: {result['accuracy']:.4f}")
         except Exception as e:

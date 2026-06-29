@@ -28,7 +28,7 @@ def get_history(ticker_code: str):
         stock_df = fetch_stock_data(ticker_code, years=3)
         market_data = fetch_market_data(years=3)
         investor_df = fetch_investor_data(ticker_code, days=750)
-        df = build_features(stock_df, market_data, investor_df)
+        df = build_features(stock_df, market_data, investor_df, ticker_code=ticker_code)
         results = backtest(ticker_code, df)
         # 신호일(선물+ AND 콜+) 표시
         sig_map = flow_signal_map()

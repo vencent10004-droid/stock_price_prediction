@@ -48,7 +48,7 @@ def get_report(ticker_code: str, generate: bool = False):
             investor_df = fetch_investor_data(ticker_code, days=90)
             headlines = fetch_naver_news(ticker_code, ticker_name, max_articles=10)
             sentiment = analyze_sentiment(ticker_name, headlines)
-            df = build_features(stock_df, market_data, investor_df, sentiment["score"])
+            df = build_features(stock_df, market_data, investor_df, sentiment["score"], ticker_code=ticker_code)
             latest = df.iloc[-1]
             prediction = predict(ticker_code, latest)
             indicators = {k: round(float(latest.get(k, 0)), 4)
