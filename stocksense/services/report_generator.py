@@ -31,8 +31,13 @@ GRAY_LIGHT  = "#F3F4F6"
 WHITE       = "#FFFFFF"
 
 
+# 저장소에 동봉한 한글 폰트(OS 무관, 배포 서버에서도 한글 렌더 보장)
+BUNDLED_FONT = str(Path(__file__).parent.parent / "assets" / "fonts" / "NotoSansKR.ttf")
+
+
 def _set_font():
     candidates = [
+        BUNDLED_FONT,                      # 동봉 폰트 우선
         "C:/Windows/Fonts/malgun.ttf",
         "C:/Windows/Fonts/NanumGothic.ttf",
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
@@ -52,6 +57,13 @@ def _register_pdf_font():
     """reportlab 한글 폰트 등록 → (font_name, bold_name)"""
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+    # 동봉 폰트 우선 → 단일 굵기라 일반/볼드 동일 폰트 사용
+    if os.path.exists(BUNDLED_FONT):
+        try:
+            pdfmetrics.registerFont(TTFont("KR", BUNDLED_FONT))
+            return "KR", "KR"
+        except Exception:
+            pass
     for path in ["C:/Windows/Fonts/malgun.ttf", "C:/Windows/Fonts/malgunbd.ttf",
                  "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"]:
         if os.path.exists(path):
