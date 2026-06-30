@@ -32,12 +32,22 @@ WHITE       = "#FFFFFF"
 
 
 # 저장소에 동봉한 한글 폰트(OS 무관, 배포 서버에서도 한글 렌더 보장)
-BUNDLED_FONT = str(Path(__file__).parent.parent / "assets" / "fonts" / "NotoSansKR.ttf")
+# 가변폰트 기본 두께가 얇아 흐리므로, 두께 고정(Regular/Bold) 정적 폰트를 사용
+_FONT_DIR = Path(__file__).parent.parent / "assets" / "fonts"
+BUNDLED_FONT = str(_FONT_DIR / "NotoSansKR-Regular.ttf")
+BUNDLED_FONT_BOLD = str(_FONT_DIR / "NotoSansKR-Bold.ttf")
 
 
 def _set_font():
+    if os.path.exists(BUNDLED_FONT):                 # 동봉 정적 폰트 우선
+        fm.fontManager.addfont(BUNDLED_FONT)
+        if os.path.exists(BUNDLED_FONT_BOLD):
+            fm.fontManager.addfont(BUNDLED_FONT_BOLD)
+        name = fm.FontProperties(fname=BUNDLED_FONT).get_name()
+        plt.rcParams["font.family"] = name
+        plt.rcParams["axes.unicode_minus"] = False
+        return name
     candidates = [
-        BUNDLED_FONT,                      # 동봉 폰트 우선
         "C:/Windows/Fonts/malgun.ttf",
         "C:/Windows/Fonts/NanumGothic.ttf",
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
@@ -57,11 +67,13 @@ def _register_pdf_font():
     """reportlab 한글 폰트 등록 → (font_name, bold_name)"""
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    # 동봉 폰트 우선 → 단일 굵기라 일반/볼드 동일 폰트 사용
+    # 동봉 정적 폰트 우선 (Regular + Bold 분리 등록 → 또렷한 두께)
     if os.path.exists(BUNDLED_FONT):
         try:
             pdfmetrics.registerFont(TTFont("KR", BUNDLED_FONT))
-            return "KR", "KR"
+            bold = BUNDLED_FONT_BOLD if os.path.exists(BUNDLED_FONT_BOLD) else BUNDLED_FONT
+            pdfmetrics.registerFont(TTFont("KR-Bold", bold))
+            return "KR", "KR-Bold"
         except Exception:
             pass
     for path in ["C:/Windows/Fonts/malgun.ttf", "C:/Windows/Fonts/malgunbd.ttf",
