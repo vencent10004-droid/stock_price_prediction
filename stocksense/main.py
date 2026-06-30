@@ -8,10 +8,17 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-from routers import dashboard, predict_api, report_api, history_api
+# 콘솔 + 파일(logs/app.log) 로깅 — UI 실행 로그 화면(SCR-04)에서 조회
+_LOG_DIR = Path(__file__).parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_file_handler = logging.FileHandler(_LOG_DIR / "app.log", encoding="utf-8")
+_file_handler.setFormatter(logging.Formatter(_fmt))
+logging.basicConfig(level=logging.INFO, format=_fmt,
+                    handlers=[logging.StreamHandler(), _file_handler])
+
+from routers import dashboard, predict_api, report_api, history_api, logs_api
 
 _scheduler = None
 
@@ -41,6 +48,7 @@ app.include_router(dashboard.router)
 app.include_router(predict_api.router)
 app.include_router(report_api.router)
 app.include_router(history_api.router)
+app.include_router(logs_api.router)
 
 
 if __name__ == "__main__":

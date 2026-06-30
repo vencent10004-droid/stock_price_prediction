@@ -64,6 +64,14 @@
   .tab-content { display: none; }
   .tab-content.active { display: block; }
   .report-actions { display: flex; gap: 8px; }
+  .log-box { background: #0B1220; border: 1px solid #1E293B; border-radius: 8px; padding: 8px 0; max-height: 480px; overflow-y: auto; font-family: Consolas, monospace; font-size: 0.78rem; }
+  .log-row { display: flex; gap: 10px; padding: 3px 14px; }
+  .log-row:hover { background: #111c30; }
+  .log-time { color: #64748B; white-space: nowrap; }
+  .log-lvl { width: 44px; font-weight: 700; }
+  .log-INFO { color: #93C5FD; } .log-WARNING { color: #FBBF24; } .log-ERROR { color: #F87171; } .log-OK { color: #22C55E; }
+  .log-name { color: #94A3B8; white-space: nowrap; }
+  .log-msg { color: #CBD5E1; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -94,6 +102,7 @@
     <div class="tabs">
       <div class="tab active" onclick="switchTab('prediction')">예측</div>
       <div class="tab" onclick="switchTab('history')">백테스트 기록</div>
+      <div class="tab" onclick="loadLogs()">실행 로그</div>
     </div>
 
     <div id="tab-prediction" class="tab-content active">
@@ -101,6 +110,9 @@
     </div>
     <div id="tab-history" class="tab-content">
       <div id="history-content"><div class="loading">백테스트 버튼을 눌러 기록을 불러오세요.</div></div>
+    </div>
+    <div id="tab-logs" class="tab-content">
+      <div id="logs-content"><div class="loading">실행 로그 탭을 눌러 최근 로그를 불러오세요.</div></div>
     </div>
   </div>
 </div>

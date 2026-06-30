@@ -1,0 +1,63 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="StockSense 서비스 플로우" id="stocksense-flow">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="StockSense 서비스 플로우차트" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;fontColor=#1A1A1A;" vertex="1" parent="1"><mxGeometry x="40" y="10" width="500" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="start" value="예측 요청 시작&#10;(사용자 선택 / 스케줄러 16:30)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="40" y="60" width="210" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="dec" value="학습 모델&#10;존재?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="85" y="170" width="120" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="err" value="404 오류 안내" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F6E4E4;strokeColor=#B23434;fontColor=#7A1F1F;fontSize=12;" vertex="1" parent="1"><mxGeometry x="300" y="70" width="150" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="c1" value="데이터 수집&#10;(수집 서비스)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="300" y="178" width="150" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="c2" value="피처 생성&#10;(feature_engine)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="300" y="310" width="150" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="c3" value="방향 예측&#10;(RF + XGB 앙상블)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="540" y="310" width="170" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="c4" value="가격대·리포트·코멘트 생성&#10;(price_range · report · Gemini)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="540" y="178" width="200" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="c5" value="결과 출력&#10;(대시보드 · PDF · 이메일)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="800" y="178" width="190" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="end" value="종료" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAE6;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=12;" vertex="1" parent="1"><mxGeometry x="860" y="70" width="130" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="t1" value="FinanceDataReader&#10;주가 · 지수 · 환율" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="450" width="160" height="48" as="geometry"/></mxCell>
+        <mxCell id="t2" value="pykrx / KRX&#10;외국인 · 기관 수급" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="450" width="160" height="48" as="geometry"/></mxCell>
+        <mxCell id="t3" value="네이버 뉴스 API&#10;헤드라인 수집" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="400" y="450" width="160" height="48" as="geometry"/></mxCell>
+        <mxCell id="t4" value="Google Gemini&#10;감성분석 · 코멘트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="580" y="450" width="160" height="48" as="geometry"/></mxCell>
+        <mxCell id="t5" value="ML 모델 (.pkl)&#10;방향 예측" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="760" y="450" width="160" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="st1" value="데이터 · 설정 저장소&#10;(CSV · YAML)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#E8EAE6;strokeColor=#8A968D;fontColor=#2A2A2A;fontSize=11;" vertex="1" parent="1"><mxGeometry x="260" y="580" width="150" height="70" as="geometry"/></mxCell>
+        <mxCell id="st2" value="모델 저장소&#10;(models/*.pkl)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#E8EAE6;strokeColor=#8A968D;fontColor=#2A2A2A;fontSize=11;" vertex="1" parent="1"><mxGeometry x="770" y="580" width="150" height="70" as="geometry"/></mxCell>
+
+        <mxCell id="e_s_d" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="start" target="dec"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_d_c1" value="예" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;fontColor=#3A4A3F;" edge="1" parent="1" source="dec" target="c1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_d_err" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#B23434;fontColor=#B23434;" edge="1" parent="1" source="dec" target="err"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_err_end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#B23434;" edge="1" parent="1" source="err" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c1_c2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c2_c3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="c2" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c3_c4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="c3" target="c4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c4_c5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="c4" target="c5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c5_end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#3A4A3F;" edge="1" parent="1" source="c5" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e_c1_t1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c1" target="t1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c1_t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c1" target="t2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c1_t3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c1" target="t3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c2_t4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c2" target="t4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c4_t4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c4" target="t4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_c3_t5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#4D6356;" edge="1" parent="1" source="c3" target="t5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e_t2_st1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#8A968D;" edge="1" parent="1" source="t2" target="st1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_t5_st2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;dashed=1;strokeColor=#8A968D;" edge="1" parent="1" source="t5" target="st2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="lg_s" value="서비스 단계" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAF8;strokeColor=#3A4A3F;fontColor=#1A1A1A;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="690" width="110" height="34" as="geometry"/></mxCell>
+        <mxCell id="lg_t" value="도구 / 외부 연동" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6E8B7B;strokeColor=#4D6356;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="170" y="690" width="130" height="34" as="geometry"/></mxCell>
+        <mxCell id="lg_db" value="저장소 (DB/파일)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#E8EAE6;strokeColor=#8A968D;fontColor=#2A2A2A;fontSize=11;" vertex="1" parent="1"><mxGeometry x="320" y="684" width="130" height="46" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

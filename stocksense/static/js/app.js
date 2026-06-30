@@ -15,11 +15,42 @@ function selectTicker(code, name) {
 
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((t, i) => {
-    const names = ["prediction", "history"];
+    const names = ["prediction", "history", "logs"];
     t.classList.toggle("active", names[i] === name);
   });
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
+}
+
+async function loadLogs() {
+  const el = document.getElementById("logs-content");
+  el.innerHTML = '<div class="loading">실행 로그 불러오는 중...</div>';
+  switchTab("logs");
+  try {
+    const res = await fetch("/api/logs?lines=120");
+    const d = await res.json();
+    renderLogs(el, d);
+  } catch (e) {
+    el.innerHTML = '<div class="error">로그 조회 오류: ' + e.message + '</div>';
+  }
+}
+
+function renderLogs(el, d) {
+  const recs = d.records || [];
+  if (!recs.length) { el.innerHTML = '<div class="loading">기록된 로그가 없습니다.</div>'; return; }
+  const rows = recs.map(r => `
+    <div class="log-row">
+      <span class="log-time">${r.time}</span>
+      <span class="log-lvl log-${r.level}">${r.level}</span>
+      <span class="log-name">${r.name}</span>
+      <span class="log-msg">${r.msg.replace(/</g,'&lt;')}</span>
+    </div>`).join('');
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:0.85rem;color:#64748B">최근 실행 로그 (${recs.length}건, 최신순)</span>
+      <button class="btn btn-sm" onclick="loadLogs()">🔄 새로고침</button>
+    </div>
+    <div class="log-box">${rows}</div>`;
 }
 
 async function loadPrediction() {
