@@ -47,7 +47,7 @@ function renderLogs(el, d) {
     </div>`).join('');
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:0.85rem;color:var(--text-secondary)">최근 실행 로그 (${recs.length}건, 최신순)</span>
+      <span style="font-size:0.85rem;color:#64748B">최근 실행 로그 (${recs.length}건, 최신순)</span>
       <button class="btn btn-sm" onclick="loadLogs()">🔄 새로고침</button>
     </div>
     <div class="log-box">${rows}</div>`;
@@ -80,11 +80,11 @@ function renderPrediction(el, d) {
 
   const sig = d.strong_signal || {};
   const sigBadge = sig.active ? `
-    <div style="background:#FCE9E4;border:1px solid #F2935C;border-radius:var(--radius-card);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:1.3rem">⭐</span>
+    <div style="background:#7F1D1D;border:1px solid #EF4444;border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.2rem">⭐</span>
       <div>
-        <div style="font-weight:700;color:#C76A2E">강한 상승 신호 — 외국인 선물 + 콜옵션 동반 순매수</div>
-        <div style="font-size:0.76rem;color:#A8632F;margin-top:2px">최근(${sig.date}) 외국인이 선물·콜옵션을 함께 순매수 → 과거 이 조건일 때 다음날 상승 72%</div>
+        <div style="font-weight:700;color:#FCA5A5">강한 상승 신호 — 외국인 선물 + 콜옵션 동반 순매수</div>
+        <div style="font-size:0.75rem;color:#FECACA;margin-top:2px">최근(${sig.date}) 외국인이 선물·콜옵션을 함께 순매수 → 과거 이 조건일 때 다음날 상승 72%</div>
       </div>
     </div>` : '';
 
@@ -120,9 +120,9 @@ function renderPrediction(el, d) {
     ${renderPriceRange(d)}
     ${renderSentiment(d)}
 
-    <div style="margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary)">애널리스트 코멘트</div>
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">애널리스트 코멘트</div>
     <div class="comment-box">${d.analyst_comment || '코멘트 없음'}</div>
-    <div style="font-size:0.75rem;color:var(--text-tertiary)">생성: ${d.generated_at?.replace('T', ' ').slice(0,19) ?? ''}</div>
+    <div style="font-size:0.75rem;color:#475569">생성: ${d.generated_at?.replace('T', ' ').slice(0,19) ?? ''}</div>
   `;
 }
 
@@ -131,19 +131,19 @@ function renderPriceRange(d) {
   const bear = d.bear || {};
   if (!bull.low && !bear.low) return '';
   return `
-    <div style="margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary)">가격대 예측 (다음 거래일)</div>
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">가격대 예측 (다음 거래일)</div>
     <div class="price-range" style="margin-bottom:16px">
       <div class="range-card bull">
         <h4>▲ 상승 시나리오</h4>
         <div class="range-val up">${Number(bull.low).toLocaleString()} ~ ${Number(bull.high).toLocaleString()}원</div>
-        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:6px">
+        <div style="font-size:0.75rem;color:#64748B;margin-top:6px">
           저항1: ${Number(bull.resistance1||0).toLocaleString()} / 저항2: ${Number(bull.resistance2||0).toLocaleString()}
         </div>
       </div>
       <div class="range-card bear">
         <h4>▼ 하락 시나리오</h4>
         <div class="range-val down">${Number(bear.low).toLocaleString()} ~ ${Number(bear.high).toLocaleString()}원</div>
-        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:6px">
+        <div style="font-size:0.75rem;color:#64748B;margin-top:6px">
           지지1: ${Number(bear.support1||0).toLocaleString()} / 지지2: ${Number(bear.support2||0).toLocaleString()}
         </div>
       </div>
@@ -158,27 +158,27 @@ function renderSentiment(d) {
   const score = d.sentiment_score ?? 0;
   const label = score > 0.1 ? '긍정' : score < -0.1 ? '부정' : '중립';
   return `
-    <div style="margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary)">뉴스 감성 분석</div>
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#64748B">뉴스 감성 분석</div>
     <div class="news-sent" style="margin-bottom:8px">
-      <span style="font-size:0.8rem;color:var(--text-secondary)">${score.toFixed(2)} (${label})</span>
+      <span style="font-size:0.8rem;color:#94A3B8">${score.toFixed(2)} (${label})</span>
       <div class="sent-bar">
         <div class="sent-pos" style="width:${pos/total*100}%"></div>
         <div class="sent-neu" style="width:${neu/total*100}%"></div>
         <div class="sent-neg" style="width:${neg/total*100}%"></div>
       </div>
-      <span style="font-size:0.75rem;color:var(--text-secondary)">긍${pos} 중${neu} 부${neg}</span>
+      <span style="font-size:0.75rem;color:#64748B">긍${pos} 중${neu} 부${neg}</span>
     </div>
-    <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px">${d.sentiment_summary || ''}</div>
+    <div style="font-size:0.82rem;color:#94A3B8;margin-bottom:12px">${d.sentiment_summary || ''}</div>
     ${(d.headlines && d.headlines.length > 0) ? `
-    <div style="margin-bottom:6px;font-size:0.8rem;color:var(--text-secondary)">주요 뉴스 헤드라인 (${d.headlines.length}건)</div>
+    <div style="margin-bottom:6px;font-size:0.8rem;color:#64748B">주요 뉴스 헤드라인 (${d.headlines.length}건)</div>
     <div style="display:flex;flex-direction:column;gap:4px">
       ${d.headlines.map((h, i) => {
         const title = (typeof h === 'object' && h !== null) ? h.title : h;
         const url = (typeof h === 'object' && h !== null) ? h.url : '';
         const inner = `${i+1}. ${title}`;
         return url
-          ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="font-size:0.8rem;color:var(--text-primary);padding:7px 10px;background:var(--surface-muted);border-radius:var(--radius-sm);border-left:3px solid var(--primary);text-decoration:none;display:block;transition:background 0.15s" onmouseover="this.style.background='var(--primary-soft)'" onmouseout="this.style.background='var(--surface-muted)'">${inner} <span style="color:var(--text-tertiary);font-size:0.72rem">↗</span></a>`
-          : `<div style="font-size:0.8rem;color:var(--text-primary);padding:7px 10px;background:var(--surface-muted);border-radius:var(--radius-sm);border-left:3px solid var(--primary)">${inner}</div>`;
+          ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem;color:#CBD5E1;padding:5px 8px;background:#1E293B;border-radius:4px;border-left:2px solid #3B82F6;text-decoration:none;display:block;transition:background 0.15s" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1E293B'">${inner} <span style="color:#64748B;font-size:0.7rem">↗</span></a>`
+          : `<div style="font-size:0.78rem;color:#CBD5E1;padding:5px 8px;background:#1E293B;border-radius:4px;border-left:2px solid #3B82F6">${inner}</div>`;
       }).join('')}
     </div>` : ''}`;
 }
@@ -205,7 +205,7 @@ async function loadHistory() {
 function renderHistory(el, d) {
   const pct = (d.accuracy * 100).toFixed(1);
   const rows = (d.records || []).slice().reverse().map(r => `
-    <tr style="${r.signal ? 'background:#FCEEE3' : ''}">
+    <tr style="${r.signal ? 'background:#7F1D1D33' : ''}">
       <td>${r.date}</td>
       <td class="${r.predicted === '상승' ? 'up' : 'down'}">${r.predicted}</td>
       <td class="${r.actual === '상승' ? 'up' : 'down'}">${r.actual}</td>
@@ -222,7 +222,7 @@ function renderHistory(el, d) {
       <div class="stat-card"><div class="label">정확도</div><div class="value">${pct}%</div></div>
       <div class="stat-card"><div class="label">⭐ 신호일</div><div class="value">${sigCount}일</div></div>
     </div>
-    <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:10px">⭐ = 외국인 선물 + 콜옵션 동반 순매수일 (과거 이 조건 다음날 상승 72%)</div>
+    <div style="font-size:0.78rem;color:#94A3B8;margin-bottom:10px">⭐ = 외국인 선물 + 콜옵션 동반 순매수일 (과거 이 조건 다음날 상승 72%)</div>
     <div style="overflow-x:auto">
       <table class="history-table">
         <thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>정오</th><th>신뢰도</th><th>신호</th></tr></thead>
