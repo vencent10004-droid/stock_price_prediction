@@ -80,6 +80,26 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000   # 웹 서버 실행
 
 ---
 
+## ☁️ 클라우드 배포 (Render.com)
+
+외부에서 브라우저로 접속 가능한 웹 서비스로 배포하려면:
+
+1. [Render.com](https://render.com) 가입 후 GitHub 계정 연결
+2. 대시보드 → **New → Blueprint** → 이 저장소(`stock_price_prediction`) 선택
+   - 저장소 루트의 `render.yaml`을 자동 인식한다.
+3. 환경변수 입력 (Environment 탭):
+   - `GEMINI_API_KEY` — **필수** (Google AI Studio에서 발급)
+   - `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECIPIENTS` — 이메일 리포트 사용 시 (Gmail은 앱 비밀번호)
+4. **Create** → 자동 빌드·배포 → 발급된 `https://stocksense-xxxx.onrender.com` 주소를 외부인에게 공유
+
+**배포 시 참고**
+- 학습 모델(`models/`)은 저장소에 포함되어 있어 배포 즉시 예측이 동작한다.
+- 무료 플랜은 15분 미사용 시 휴면(첫 접속이 느려짐)하며 RAM 512MB 제한이 있다. 안정 운영 시 유료 플랜 권장.
+- 접속자 모두가 배포자의 `GEMINI_API_KEY`를 공유 사용한다(호출 비용·한도 주의).
+- 자동 스케줄러(매일 16:30 이메일)는 서버 휴면 시 발동되지 않는다.
+
+---
+
 ## ⚠️ 면책 고지
 이 프로그램의 예측 결과는 **학습 및 참고 목적**입니다.  
 실제 투자 결정의 책임은 본인에게 있습니다. 주식 투자에는 원금 손실 위험이 있습니다.

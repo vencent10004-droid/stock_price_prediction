@@ -11,8 +11,9 @@ __pycache__/
 venv/
 env/
 
-# ===== 학습된 모델 (재생성: python train.py) =====
-stocksense/models/
+# ===== 학습된 모델 =====
+# 클라우드 배포 시 예측이 바로 동작하도록 저장소에 포함 (재생성: python train.py)
+# stocksense/models/
 
 # ===== 생성 산출물 =====
 stocksense/reports/

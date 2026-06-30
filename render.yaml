@@ -1,0 +1,28 @@
+# Render.com 배포 설정 (Blueprint)
+# 사용법: Render 대시보드 → New → Blueprint → 이 저장소 선택
+# 환경변수(GEMINI_API_KEY 등)는 대시보드에서 직접 입력 (sync:false 항목)
+services:
+  - type: web
+    name: stocksense
+    runtime: python
+    rootDir: stocksense
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: MPLBACKEND          # matplotlib 헤드리스 서버용
+        value: "Agg"
+      - key: GEMINI_API_KEY      # 대시보드에서 직접 입력
+        sync: false
+      - key: EMAIL_SENDER        # (이메일 발송 쓸 때만) 대시보드에서 입력
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_RECIPIENTS
+        sync: false
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
