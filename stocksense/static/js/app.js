@@ -24,6 +24,7 @@ function switchTab(name) {
 
 let chartDays = 90;       // 30 | 90 | 180
 let chartType = "candle"; // "candle" | "line"
+let showBB = false, showRSI = false, showMACD = false;  // 보조지표 토글
 let lastChartData = null;
 
 async function loadChart(days) {
@@ -51,33 +52,65 @@ function setChartType(t) {
   if (lastChartData) renderChart(document.getElementById("chart-content"), lastChartData);
 }
 
+function toggleInd(k) {
+  if (k === "bb") showBB = !showBB;
+  else if (k === "rsi") showRSI = !showRSI;
+  else if (k === "macd") showMACD = !showMACD;
+  if (lastChartData) renderChart(document.getElementById("chart-content"), lastChartData);
+}
+
 function renderChart(el, d) {
   const close = d.close || [], dates = d.dates || [], ma5 = d.ma5 || [], ma20 = d.ma20 || [], vol = d.volume || [];
   const open = d.open || [], high = d.high || [], low = d.low || [];
+  const bbU = d.bb_upper || [], bbL = d.bb_lower || [];
+  const rsi = d.rsi || [], macd = d.macd || [], sig = d.macd_signal || [], hist = d.macd_hist || [];
   const n = close.length;
   if (!n) { el.innerHTML = '<div class="loading">차트 데이터가 없습니다.</div>'; return; }
   const hasOHLC = open.length === n && high.length === n && low.length === n;
   const candle = chartType === "candle" && hasOHLC;
-
-  const W = 760, H = 380, padL = 6, padR = 66, padT = 14, priceH = 250, volTop = 292, volH = 66;
-  const xs = i => padL + (W - padL - padR) * (n === 1 ? 0 : i / (n - 1));
-
-  // 가격 범위: 캔들이면 고가/저가까지 포함
-  const priceVals = [...(candle ? [...high, ...low] : close),
-                     ...ma5.filter(v => v != null), ...ma20.filter(v => v != null)];
-  let lo = Math.min(...priceVals), hi = Math.max(...priceVals);
-  const gap = (hi - lo) * 0.08 || 1; lo -= gap; hi += gap;
-  const py = v => padT + priceH * (1 - (v - lo) / (hi - lo));
-  const poly = arr => arr.map((v, i) => v == null ? null : `${xs(i).toFixed(1)},${py(v).toFixed(1)}`)
-                        .filter(Boolean).join(' ');
   const UP = "#EF4444", DOWN = "#3B82F6";
 
-  // 가로 그리드 + 가격 라벨(우측)
+  // ── 패널 동적 배치 ──
+  const W = 760, padL = 6, padR = 66, padT = 14, gap = 26;
+  const priceH = 240, volH = 46, subH = 62;
+  let y = padT;
+  const priceTop = y; y += priceH + gap;
+  const volTop = y;   y += volH + gap;
+  let rsiTop = null, macdTop = null;
+  if (showRSI)  { rsiTop = y;  y += subH + gap; }
+  if (showMACD) { macdTop = y; y += subH + gap; }
+  const lastBottom = y - gap;
+  const H = lastBottom + 20;
+  const xLabelY = lastBottom + 14;
+  const xs = i => padL + (W - padL - padR) * (n === 1 ? 0 : i / (n - 1));
+
+  // ── 가격 범위 ──
+  const bbVals = showBB ? [...bbU.filter(v => v != null), ...bbL.filter(v => v != null)] : [];
+  const priceVals = [...(candle ? [...high, ...low] : close),
+                     ...ma5.filter(v => v != null), ...ma20.filter(v => v != null), ...bbVals];
+  let lo = Math.min(...priceVals), hi = Math.max(...priceVals);
+  const gp = (hi - lo) * 0.08 || 1; lo -= gp; hi += gp;
+  const py = v => priceTop + priceH * (1 - (v - lo) / (hi - lo));
+  const poly = (arr, f) => arr.map((v, i) => v == null ? null : `${xs(i).toFixed(1)},${f(v).toFixed(1)}`)
+                              .filter(Boolean).join(' ');
+
+  // 가격 그리드 + 라벨
   let grid = '';
   for (let k = 0; k <= 4; k++) {
     const val = lo + (hi - lo) * k / 4, yy = py(val);
     grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1E293B"/>`;
     grid += `<text x="${W - padR + 6}" y="${(yy + 3).toFixed(1)}" fill="#64748B" font-size="10">${Math.round(val).toLocaleString()}</text>`;
+  }
+
+  // 볼린저밴드 오버레이
+  let bb = '';
+  if (showBB) {
+    const upPts = bbU.map((v, i) => v == null ? null : `${xs(i).toFixed(1)},${py(v).toFixed(1)}`).filter(Boolean);
+    const lwPts = bbL.map((v, i) => v == null ? null : `${xs(i).toFixed(1)},${py(v).toFixed(1)}`).filter(Boolean).reverse();
+    if (upPts.length && lwPts.length)
+      bb += `<polygon points="${upPts.concat(lwPts).join(' ')}" fill="#8B5CF6" opacity="0.10"/>`;
+    bb += `<polyline points="${poly(bbU, py)}" fill="none" stroke="#8B5CF6" stroke-width="1" opacity="0.75"/>`;
+    bb += `<polyline points="${poly(bbL, py)}" fill="none" stroke="#8B5CF6" stroke-width="1" opacity="0.75"/>`;
   }
 
   // 거래량 막대
@@ -90,35 +123,66 @@ function renderChart(el, d) {
     bars += `<rect x="${(xs(i) - bw / 2).toFixed(1)}" y="${(volTop + volH - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${up ? UP : DOWN}" opacity="0.5"/>`;
   }
 
-  // 메인 시리즈: 캔들 또는 라인
+  // 메인 시리즈 (캔들/라인) + MA
   let series = '';
   if (candle) {
     for (let i = 0; i < n; i++) {
       const o = open[i], c = close[i], h = high[i], l = low[i];
       const up = c >= o, col = up ? UP : DOWN, X = xs(i);
-      const top = py(Math.max(o, c)), bot = py(Math.min(o, c));
-      const bh = Math.max(1, bot - top);
+      const top = py(Math.max(o, c)), bot = py(Math.min(o, c)), bh = Math.max(1, bot - top);
       series += `<line x1="${X.toFixed(1)}" y1="${py(h).toFixed(1)}" x2="${X.toFixed(1)}" y2="${py(l).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
       series += `<rect x="${(X - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}"/>`;
     }
   } else {
-    const last = close[n - 1], first = close[0];
-    const lastColor = last >= first ? UP : DOWN, lx = xs(n - 1), ly = py(last);
-    series = `<polyline points="${poly(close)}" fill="none" stroke="#E2E8F0" stroke-width="1.8"/>
-      <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="${lastColor}"/>
-      <text x="${(lx - 6).toFixed(1)}" y="${(ly - 8).toFixed(1)}" fill="${lastColor}" font-size="11" font-weight="700" text-anchor="end">${last.toLocaleString()}</text>`;
+    const lastP = close[n - 1], firstP = close[0], lc = lastP >= firstP ? UP : DOWN, lx = xs(n - 1), ly = py(lastP);
+    series = `<polyline points="${poly(close, py)}" fill="none" stroke="#E2E8F0" stroke-width="1.8"/>
+      <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="${lc}"/>
+      <text x="${(lx - 6).toFixed(1)}" y="${(ly - 8).toFixed(1)}" fill="${lc}" font-size="11" font-weight="700" text-anchor="end">${lastP.toLocaleString()}</text>`;
+  }
+  series += `<polyline points="${poly(ma20, py)}" fill="none" stroke="#FBBF24" stroke-width="1.3" opacity="0.9"/>
+             <polyline points="${poly(ma5, py)}" fill="none" stroke="#22C55E" stroke-width="1.3" opacity="0.9"/>`;
+
+  // RSI 패널
+  let rsiPanel = '';
+  if (showRSI) {
+    const ry = v => rsiTop + subH * (1 - Math.max(0, Math.min(100, v)) / 100);
+    [[70, "#7F1D1D"], [50, "#334155"], [30, "#155E45"]].forEach(([lv, c]) =>
+      rsiPanel += `<line x1="${padL}" y1="${ry(lv).toFixed(1)}" x2="${W - padR}" y2="${ry(lv).toFixed(1)}" stroke="${c}" stroke-dasharray="3 3"/>`);
+    rsiPanel += `<text x="${W - padR + 6}" y="${(ry(70) + 3).toFixed(1)}" fill="#64748B" font-size="9">70</text>`;
+    rsiPanel += `<text x="${W - padR + 6}" y="${(ry(30) + 3).toFixed(1)}" fill="#64748B" font-size="9">30</text>`;
+    rsiPanel += `<polyline points="${poly(rsi, ry)}" fill="none" stroke="#A78BFA" stroke-width="1.3"/>`;
+    const cur = [...rsi].reverse().find(v => v != null);
+    rsiPanel += `<text x="${padL + 2}" y="${(rsiTop + 12).toFixed(1)}" fill="#A78BFA" font-size="10" font-weight="700">RSI(14) ${cur != null ? cur.toFixed(1) : '-'}</text>`;
+  }
+
+  // MACD 패널
+  let macdPanel = '';
+  if (showMACD) {
+    const vals = [...macd, ...sig, ...hist].filter(v => v != null).map(Math.abs);
+    const m = Math.max(...vals, 1e-9);
+    const my = v => macdTop + subH * (1 - (v + m) / (2 * m));
+    macdPanel += `<line x1="${padL}" y1="${my(0).toFixed(1)}" x2="${W - padR}" y2="${my(0).toFixed(1)}" stroke="#334155"/>`;
+    const mbw = Math.max(1, (W - padL - padR) / n * 0.5);
+    for (let i = 0; i < n; i++) {
+      if (hist[i] == null) continue;
+      const zero = my(0), hy = my(hist[i]), top = Math.min(zero, hy), h = Math.max(1, Math.abs(hy - zero));
+      macdPanel += `<rect x="${(xs(i) - mbw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${mbw.toFixed(1)}" height="${h.toFixed(1)}" fill="${hist[i] >= 0 ? UP : DOWN}" opacity="0.55"/>`;
+    }
+    macdPanel += `<polyline points="${poly(macd, my)}" fill="none" stroke="#38BDF8" stroke-width="1.2"/>`;
+    macdPanel += `<polyline points="${poly(sig, my)}" fill="none" stroke="#F59E0B" stroke-width="1.2"/>`;
+    macdPanel += `<text x="${padL + 2}" y="${(macdTop + 12).toFixed(1)}" fill="#94A3B8" font-size="10" font-weight="700">MACD(12,26,9)</text>`;
   }
 
   const last = close[n - 1], first = close[0];
-  const chgPct = ((last - first) / first * 100);
-  const lastColor = last >= first ? UP : DOWN;
-
+  const chgPct = ((last - first) / first * 100), lastColor = last >= first ? UP : DOWN;
   const midIdx = Math.floor((n - 1) / 2);
   const xlabels = [0, midIdx, n - 1].map(i =>
-    `<text x="${xs(i).toFixed(1)}" y="${H - 4}" fill="#64748B" font-size="10" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${dates[i].slice(2)}</text>`).join('');
+    `<text x="${xs(i).toFixed(1)}" y="${xLabelY}" fill="#64748B" font-size="10" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${dates[i].slice(2)}</text>`).join('');
 
-  const pBtn = (dv, lbl) => `<button class="btn btn-sm" onclick="loadChart(${dv})" style="${chartDays === dv ? 'background:#1E3A8A;color:#93C5FD;border-color:#3B82F6' : ''}">${lbl}</button>`;
-  const tBtn = (tv, lbl) => `<button class="btn btn-sm" onclick="setChartType('${tv}')" style="${chartType === tv ? 'background:#1E3A8A;color:#93C5FD;border-color:#3B82F6' : ''}">${lbl}</button>`;
+  const on = "background:#1E3A8A;color:#93C5FD;border-color:#3B82F6";
+  const pBtn = (dv, lbl) => `<button class="btn btn-sm" onclick="loadChart(${dv})" style="${chartDays === dv ? on : ''}">${lbl}</button>`;
+  const tBtn = (tv, lbl) => `<button class="btn btn-sm" onclick="setChartType('${tv}')" style="${chartType === tv ? on : ''}">${lbl}</button>`;
+  const iBtn = (kv, lbl, active) => `<button class="btn btn-sm" onclick="toggleInd('${kv}')" style="${active ? on : ''}">${lbl}</button>`;
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -133,22 +197,26 @@ function renderChart(el, d) {
       ${pBtn(30, '30일')}${pBtn(90, '90일')}${pBtn(180, '180일')}
       <span style="width:1px;height:20px;background:#334155;margin:0 4px"></span>
       ${tBtn('candle', '캔들')}${tBtn('line', '라인')}
+      <span style="width:1px;height:20px;background:#334155;margin:0 4px"></span>
+      ${iBtn('bb', '볼린저', showBB)}${iBtn('rsi', 'RSI', showRSI)}${iBtn('macd', 'MACD', showMACD)}
     </div>
     <div style="display:flex;gap:14px;font-size:0.75rem;color:#94A3B8;margin-bottom:6px;flex-wrap:wrap">
-      ${candle ? '<span><span style="color:#EF4444">▮</span>/<span style="color:#3B82F6">▮</span> 캔들(양/음봉)</span>' : '<span><span style="color:#E2E8F0">━</span> 종가</span>'}
+      ${candle ? '<span><span style="color:#EF4444">▮</span>/<span style="color:#3B82F6">▮</span> 캔들</span>' : '<span><span style="color:#E2E8F0">━</span> 종가</span>'}
       <span><span style="color:#22C55E">━</span> MA5</span>
       <span><span style="color:#FBBF24">━</span> MA20</span>
+      ${showBB ? '<span><span style="color:#8B5CF6">━</span> 볼린저</span>' : ''}
       <span style="margin-left:auto"><span style="color:#EF4444">▮</span>/<span style="color:#3B82F6">▮</span> 거래량</span>
     </div>
     <div id="cht-wrap" style="position:relative;overflow-x:auto">
     <svg id="cht-svg" viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;background:#0F172A;border-radius:8px;cursor:crosshair;display:block" xmlns="http://www.w3.org/2000/svg">
       ${grid}
+      ${bb}
       ${bars}
-      <polyline points="${poly(ma20)}" fill="none" stroke="#FBBF24" stroke-width="1.3" opacity="0.9"/>
-      <polyline points="${poly(ma5)}" fill="none" stroke="#22C55E" stroke-width="1.3" opacity="0.9"/>
       ${series}
+      ${rsiPanel}
+      ${macdPanel}
       ${xlabels}
-      <line id="cht-cx" x1="0" x2="0" y1="${padT}" y2="${volTop + volH}" stroke="#94A3B8" stroke-width="1" stroke-dasharray="4 3" opacity="0" pointer-events="none"/>
+      <line id="cht-cx" x1="0" x2="0" y1="${padT}" y2="${lastBottom}" stroke="#94A3B8" stroke-width="1" stroke-dasharray="4 3" opacity="0" pointer-events="none"/>
       <circle id="cht-cdot" r="4" fill="#E2E8F0" stroke="#0F172A" stroke-width="1.5" opacity="0" pointer-events="none"/>
     </svg>
     <div id="cht-tip" style="position:absolute;display:none;pointer-events:none;background:#1E293B;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:0.75rem;line-height:1.55;box-shadow:0 4px 14px rgba(0,0,0,0.5);z-index:5;white-space:nowrap"></div>
@@ -157,7 +225,7 @@ function renderChart(el, d) {
       <button class="btn btn-sm" onclick="loadChart()">🔄 새로고침</button>
     </div>`;
 
-  // ── 크로스헤어(확인선) + 툴팁 ──
+  // ── 크로스헤어 + 툴팁 ──
   const svg = document.getElementById("cht-svg");
   const wrap = document.getElementById("cht-wrap");
   const cx = document.getElementById("cht-cx");
@@ -178,12 +246,15 @@ function renderChart(el, d) {
     const col = chg >= 0 ? UP : DOWN;
     const ohlc = hasOHLC
       ? `<div style="color:#CBD5E1">시 ${open[i].toLocaleString()} · 고 ${high[i].toLocaleString()} · 저 ${low[i].toLocaleString()}</div>` : '';
+    const rsiLine = showRSI && rsi[i] != null ? `<div style="color:#A78BFA">RSI ${rsi[i].toFixed(1)}</div>` : '';
+    const macdLine = showMACD && hist[i] != null ? `<div style="color:#38BDF8">MACD Hist ${hist[i].toFixed(2)}</div>` : '';
     tip.innerHTML = `
       <div style="font-weight:700;margin-bottom:2px">${dates[i]}</div>
       <div>종가 <b>${c.toLocaleString()}원</b> <span style="color:${col}">${chg >= 0 ? '▲' : '▼'}${Math.abs(chgp).toFixed(2)}%</span></div>
       ${ohlc}
       <div style="color:#22C55E">MA5 ${ma5[i] != null ? Math.round(ma5[i]).toLocaleString() : '-'}</div>
       <div style="color:#FBBF24">MA20 ${ma20[i] != null ? Math.round(ma20[i]).toLocaleString() : '-'}</div>
+      ${rsiLine}${macdLine}
       <div style="color:#94A3B8">거래량 ${vol[i].toLocaleString()}</div>`;
     tip.style.display = "block";
 
