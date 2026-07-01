@@ -1,41 +1,36 @@
-"""Google Gemini REST API로 뉴스 감성 분석 및 애널리스트 코멘트 생성"""
+"""Claude(Anthropic API)로 뉴스 감성 분석 및 애널리스트 코멘트 생성"""
 
 import os
 import json
 import logging
-import requests
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+CLAUDE_MODEL = "claude-opus-4-8"  # 비용 절감이 필요하면 "claude-haiku-4-5"로 변경 가능
 
 
-def _call_gemini(prompt: str, timeout: int = 60, retries: int = 2) -> str:
-    """Gemini REST API 호출 → 텍스트 반환 (타임아웃 시 재시도)"""
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key or "여기에" in api_key:
+def _api_key() -> str:
+    key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    return "" if (not key or "여기에" in key) else key
+
+
+def _call_claude(prompt: str, max_tokens: int = 1024) -> str:
+    """Claude 메시지 API 호출 → 텍스트 반환 (SDK가 타임아웃·오류 자동 재시도)"""
+    api_key = _api_key()
+    if not api_key:
         return ""
-
-    for attempt in range(retries + 1):
-        try:
-            resp = requests.post(
-                GEMINI_URL,
-                params={"key": api_key},
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except requests.exceptions.Timeout:
-            logger.warning(f"Gemini 타임아웃 (시도 {attempt + 1}/{retries + 1})")
-            continue
-        except Exception as e:
-            logger.error(f"Gemini API 호출 실패: {e}")
-            return ""
-    logger.error("Gemini API 호출 실패: 모든 재시도 타임아웃")
-    return ""
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return "".join(b.text for b in resp.content if b.type == "text").strip()
+    except Exception as e:
+        logger.error(f"Claude API 호출 실패: {e}")
+        return ""
 
 
 def analyze_sentiment(ticker_name: str, headlines: list[str]) -> dict:
@@ -44,8 +39,7 @@ def analyze_sentiment(ticker_name: str, headlines: list[str]) -> dict:
         return {"score": 0.0, "positive": 0, "neutral": 0, "negative": 0,
                 "news_count": 0, "summary": "뉴스 없음"}
 
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key or "여기에" in api_key:
+    if not _api_key():
         return {"score": 0.0, "positive": 0, "neutral": 0, "negative": 0,
                 "news_count": 0, "summary": "API 키 미설정"}
 
@@ -65,7 +59,7 @@ def analyze_sentiment(ticker_name: str, headlines: list[str]) -> dict:
   "summary": "전반적으로 긍정적인 뉴스가 우세합니다."
 }}"""
 
-    raw = _call_gemini(prompt)
+    raw = _call_claude(prompt)
     if not raw:
         return {"score": 0.0, "positive": 0, "neutral": 0, "negative": 0,
                 "news_count": 0, "summary": "분석 실패"}
@@ -91,7 +85,7 @@ def analyze_sentiment(ticker_name: str, headlines: list[str]) -> dict:
 
 def generate_analyst_comment(ticker_name: str, prediction: dict,
                               indicators: dict, sentiment: dict) -> str:
-    """애널리스트 코멘트 생성 (Gemini 실패 시 규칙 기반 폴백)"""
+    """애널리스트 코멘트 생성 (Claude 실패 시 규칙 기반 폴백)"""
     direction = prediction.get("direction", "N/A")
     prob = prediction.get("probability", 0) * 100
     opinion = prediction.get("investment_opinion", "N/A")
@@ -115,7 +109,7 @@ def generate_analyst_comment(ticker_name: str, prediction: dict,
 
 마지막 문장은 반드시 "본 의견은 참고용이며 투자 손실의 책임은 투자자 본인에게 있습니다."로 끝내세요."""
 
-    result = _call_gemini(prompt)
+    result = _call_claude(prompt)
     if result:
         return result
     return _rule_based_comment(ticker_name, prediction, indicators, sentiment)

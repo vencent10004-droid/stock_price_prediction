@@ -14,7 +14,7 @@
 [매일 장 마감 후 16:30 자동 실행]
          │
          ├─① 주가 OHLCV + 기술적 지표 수집 (FinanceDataReader)
-         ├─② 뉴스 크롤링 → Google Gemini 감성 분석
+         ├─② 뉴스 크롤링 → Claude(Anthropic) 감성 분석
          ├─③ 외국인/기관 순매수 데이터 수집 (pykrx)
          │
          ▼
@@ -54,7 +54,7 @@
 | 기획 / 문서화 | ✅ 완료 |
 | 데이터 파이프라인 | ✅ 완료 (FinanceDataReader + pykrx) |
 | AI 예측 모델 | ✅ 완료 (RF + XGBoost, 종목별 학습) |
-| 뉴스 감성 분석 | ✅ 완료 (Google Gemini, 회사 관련성 정렬 + 기사 링크) |
+| 뉴스 감성 분석 | ✅ 완료 (Claude(Anthropic), 회사 관련성 정렬 + 기사 링크) |
 | 외국인/기관 데이터 | ✅ 완료 |
 | 애널리스트 리포트 생성 | ✅ 완료 (PDF) |
 | 이메일 알림 | ✅ 완료 (HTML 본문 + PDF 첨부) |
@@ -69,7 +69,7 @@
 cd stocksense
 pip install -r requirements.txt
 
-# .env 파일에 GEMINI_API_KEY, 이메일 설정 입력 (.env.example 참고)
+# .env 파일에 ANTHROPIC_API_KEY, 이메일 설정 입력 (.env.example 참고)
 
 python train.py        # 전체 종목 모델 학습 (최초 1회)
 python -m uvicorn main:app --host 127.0.0.1 --port 8000   # 웹 서버 실행
@@ -88,14 +88,14 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000   # 웹 서버 실행
 2. 대시보드 → **New → Blueprint** → 이 저장소(`stock_price_prediction`) 선택
    - 저장소 루트의 `render.yaml`을 자동 인식한다.
 3. 환경변수 입력 (Environment 탭):
-   - `GEMINI_API_KEY` — **필수** (Google AI Studio에서 발급)
+   - `ANTHROPIC_API_KEY` — **필수** (console.anthropic.com에서 발급)
    - `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECIPIENTS` — 이메일 리포트 사용 시 (Gmail은 앱 비밀번호)
 4. **Create** → 자동 빌드·배포 → 발급된 `https://stocksense-xxxx.onrender.com` 주소를 외부인에게 공유
 
 **배포 시 참고**
 - 학습 모델(`models/`)은 저장소에 포함되어 있어 배포 즉시 예측이 동작한다.
 - 무료 플랜은 15분 미사용 시 휴면(첫 접속이 느려짐)하며 RAM 512MB 제한이 있다. 안정 운영 시 유료 플랜 권장.
-- 접속자 모두가 배포자의 `GEMINI_API_KEY`를 공유 사용한다(호출 비용·한도 주의).
+- 접속자 모두가 배포자의 `ANTHROPIC_API_KEY`를 공유 사용한다(호출 비용·한도 주의).
 - 자동 스케줄러(매일 16:30 이메일)는 서버 휴면 시 발동되지 않는다.
 
 ---

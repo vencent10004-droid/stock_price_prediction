@@ -14,7 +14,7 @@ services:
         value: "3.12.7"
       - key: MPLBACKEND          # matplotlib 헤드리스 서버용
         value: "Agg"
-      - key: GEMINI_API_KEY      # 대시보드에서 직접 입력
+      - key: ANTHROPIC_API_KEY   # 대시보드에서 직접 입력 (Claude API 키)
         sync: false
       - key: EMAIL_SENDER        # (이메일 발송 쓸 때만) 대시보드에서 입력
         sync: false
