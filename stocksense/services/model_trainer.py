@@ -99,7 +99,12 @@ def train(ticker_code: str, df: pd.DataFrame, config: dict = None) -> dict:
 
 
 def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
-    """테스트셋 날짜별 예측 vs 실제 기록 반환"""
+    """날짜별 예측 vs 실제 기록 반환 (한 행 = 하루, 모든 값이 그날 기준).
+
+    - 실제  : 그날 실제 등락 (당일 종가 vs 전일 종가) → 종가 화살표와 일치
+    - 예측  : 그날 등락에 대한 예측 (전일 피처로 산출한 값)
+    - 오늘  : 종가가 확정되지 않아 실제/정오는 '예측 대기'
+    """
     from services.direction_predictor import load_models, models_exist
 
     if not models_exist(ticker_code):
@@ -108,33 +113,32 @@ def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
     models, names, scaler, features = load_models(ticker_code)
     feature_cols = [c for c in features if c in df.columns]
     X = df[feature_cols].values
-    y = df["target"].values                 # 마지막(오늘) 행은 NaN → 정답 미정
     closes = df["close"].values
     dates = df.index
 
     n = len(X)
-    valid_end = int(n * 0.85)
-    X_test_s = scaler.transform(X[valid_end:])
-    final_prob = np.mean([m.predict_proba(X_test_s)[:, 1] for m in models], axis=0)
+    # 전체 행 예측 확률(그날 종가 > 전일 종가일 확률) — 각 행은 전일 피처로 산출됨
+    prob_all = np.mean([m.predict_proba(scaler.transform(X))[:, 1] for m in models], axis=0)
 
+    valid_end = max(int(n * 0.85), 1)
     results = []
     for j in range(valid_end, n):
-        prob = float(final_prob[j - valid_end])
-        predicted = 1 if prob >= 0.5 else 0
-        actual = y[j]
-        pending = actual != actual          # NaN 판별(다음날 데이터 없음)
-        prev = closes[j - 1] if j > 0 else closes[j]
+        prev = closes[j - 1]
         chg_amt = int(closes[j] - prev)
         chg_pct = ((closes[j] - prev) / prev * 100) if prev else 0.0
+        actual_up = 1 if closes[j] > prev else 0          # 그날 실제 등락(화살표와 동일)
+        prob = float(prob_all[j - 1])                      # 전일 피처로 만든 그날 예측
+        predicted = 1 if prob >= 0.5 else 0
+        pending = (j == n - 1)                             # 오늘: 종가 미확정
         results.append({
             "date": str(dates[j].date()),
             "predicted": "상승" if predicted == 1 else "하락",
-            "actual": None if pending else ("상승" if actual == 1 else "하락"),
-            "correct": None if pending else bool(predicted == int(actual)),
+            "actual": None if pending else ("상승" if actual_up == 1 else "하락"),
+            "correct": None if pending else bool(predicted == actual_up),
             "prob": round(prob, 4),
             "close": int(closes[j]),         # 그날 종가(오늘은 현재가)
             "chg_amt": chg_amt,              # 전일 대비 변화 금액(원)
             "chg_pct": round(float(chg_pct), 2),  # 전일 종가 대비 변화율(%)
-            "pending": bool(pending),        # True = 오늘, 정답 미정
+            "pending": bool(pending),        # True = 오늘
         })
     return results
