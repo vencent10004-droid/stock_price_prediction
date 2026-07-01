@@ -415,14 +415,21 @@ function renderPrediction(el, d) {
   const prob = (d.probability * 100).toFixed(1);
 
   const sig = d.strong_signal || {};
-  const sigBadge = sig.active ? `
-    <div style="background:#7F1D1D;border:1px solid #EF4444;border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+  let sigBadge = '';
+  if (sig.active) {
+    const stale = sig.stale;
+    const bg = stale ? '#3B2F14' : '#7F1D1D', bd = stale ? '#B45309' : '#EF4444';
+    const tc = stale ? '#FCD34D' : '#FCA5A5', sub = stale ? '#FDE68A' : '#FECACA';
+    const note = stale ? ` <b>(⚠ 수급 데이터 ${sig.days_old}일 전 기준 — 최신이 아닐 수 있음)</b>` : '';
+    sigBadge = `
+    <div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
       <span style="font-size:1.2rem">⭐</span>
       <div>
-        <div style="font-weight:700;color:#FCA5A5">강한 상승 신호 — 외국인 선물 + 콜옵션 동반 순매수</div>
-        <div style="font-size:0.75rem;color:#FECACA;margin-top:2px">최근(${sig.date}) 외국인이 선물·콜옵션을 함께 순매수 → 과거 이 조건일 때 다음날 상승 72%</div>
+        <div style="font-weight:700;color:${tc}">강한 상승 신호 — 외국인 선물 + 콜옵션 동반 순매수</div>
+        <div style="font-size:0.75rem;color:${sub};margin-top:2px">데이터 기준일 <b>${sig.date}</b>${note} · 과거 이 조건일 때 다음날 상승 72%</div>
       </div>
-    </div>` : '';
+    </div>`;
+  }
 
   el.innerHTML = `
     ${sigBadge}
@@ -451,6 +458,10 @@ function renderPrediction(el, d) {
         <div class="label">거래량 비율</div>
         <div class="value">${d.volume_ratio?.toFixed(2) ?? '-'}x</div>
       </div>
+      <div class="stat-card">
+        <div class="label">과거 적중률</div>
+        <div class="value" id="stat-acc"><span style="font-size:0.9rem;color:#64748B">…</span></div>
+      </div>
     </div>
 
     ${renderPriceRange(d)}
@@ -460,6 +471,23 @@ function renderPrediction(el, d) {
     <div class="comment-box">${d.analyst_comment || '코멘트 없음'}</div>
     <div style="font-size:0.75rem;color:#475569">생성: ${d.generated_at?.replace('T', ' ').slice(0,19) ?? ''}</div>
   `;
+
+  loadAccuracyBadge(d.ticker_code);   // 백테스트 적중률을 비동기로 채움
+}
+
+async function loadAccuracyBadge(ticker) {
+  const elA = document.getElementById("stat-acc");
+  if (!elA) return;
+  try {
+    const res = await fetch("/api/history/" + ticker);
+    if (!res.ok) { elA.innerHTML = '<span style="font-size:0.9rem;color:#64748B">-</span>'; return; }
+    const h = await res.json();
+    const pct = (h.accuracy * 100).toFixed(1);
+    const col = h.accuracy >= 0.55 ? '#22C55E' : h.accuracy >= 0.5 ? '#FBBF24' : '#F87171';
+    elA.innerHTML = `<span style="color:${col}">${pct}%</span> <span style="font-size:0.7rem;color:#64748B">(${h.total}일)</span>`;
+  } catch {
+    elA.innerHTML = '<span style="font-size:0.9rem;color:#64748B">-</span>';
+  }
 }
 
 function renderPriceRange(d) {

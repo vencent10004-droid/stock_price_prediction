@@ -1,6 +1,11 @@
+import time
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api", tags=["history"])
+
+# 백테스트는 장중 변하지 않으므로 6시간 캐시 (적중률 배지 + 백테스트 탭 공용)
+_HIST_TTL = 6 * 3600
+_hist_cache = {}  # ticker -> (만료ts, result)
 
 
 @router.get("/history/{ticker_code}")
@@ -10,6 +15,10 @@ def get_history(ticker_code: str):
     from pathlib import Path
     from dotenv import load_dotenv
     load_dotenv()
+
+    cached = _hist_cache.get(ticker_code)
+    if cached and cached[0] > time.time():
+        return cached[1]
 
     cfg_path = Path(__file__).parent.parent / "config" / "config.yaml"
     with open(cfg_path, encoding="utf-8") as f:
@@ -39,12 +48,14 @@ def get_history(ticker_code: str):
         correct = sum(1 for r in evaluated if r["correct"])
         accuracy = correct / len(evaluated) if evaluated else 0
 
-        return {
+        result = {
             "ticker_code": ticker_code,
             "total": len(evaluated),
             "correct": correct,
             "accuracy": round(accuracy, 4),
             "records": results[-30:],  # 최근 30일만 (오늘 예측대기 행 포함)
         }
+        _hist_cache[ticker_code] = (time.time() + _HIST_TTL, result)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

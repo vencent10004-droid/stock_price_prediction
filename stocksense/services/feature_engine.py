@@ -66,9 +66,13 @@ def latest_flow_signal() -> dict:
     last = row.iloc[-1]
     fnet = float(last.get("foreign_net", 0) or 0)
     cnet = float(last.get("call_net", 0) or 0) if "call_net" in ff.columns else 0.0
+    ref_date = row.index[-1].date()
+    days_old = (pd.Timestamp.now().normalize() - pd.Timestamp(ref_date)).days
     return {
         "active": bool(fnet > 0 and cnet > 0),
-        "date": str(row.index[-1].date()),
+        "date": str(ref_date),
+        "days_old": int(days_old),     # 데이터 기준일로부터 경과 일수
+        "stale": bool(days_old > 5),   # 5일(거래일 약 1주) 초과면 오래된 데이터
         "foreign_net": fnet,
         "call_net": cnet,
     }
