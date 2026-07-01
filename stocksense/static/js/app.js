@@ -15,11 +15,106 @@ function selectTicker(code, name) {
 
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((t, i) => {
-    const names = ["prediction", "history", "logs"];
+    const names = ["prediction", "chart", "history", "logs"];
     t.classList.toggle("active", names[i] === name);
   });
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
+}
+
+async function loadChart() {
+  if (!currentTicker) return;
+  const el = document.getElementById("chart-content");
+  el.innerHTML = '<div class="loading">주가 차트 로딩 중...</div>';
+  switchTab("chart");
+  try {
+    const res = await fetch("/api/chart/" + currentTicker);
+    if (!res.ok) {
+      const err = await res.json();
+      el.innerHTML = '<div class="error">오류: ' + (err.detail || res.status) + '</div>';
+      return;
+    }
+    const d = await res.json();
+    renderChart(el, d);
+  } catch (e) {
+    el.innerHTML = '<div class="error">네트워크 오류: ' + e.message + '</div>';
+  }
+}
+
+function renderChart(el, d) {
+  const close = d.close || [], dates = d.dates || [], ma5 = d.ma5 || [], ma20 = d.ma20 || [], vol = d.volume || [];
+  const n = close.length;
+  if (!n) { el.innerHTML = '<div class="loading">차트 데이터가 없습니다.</div>'; return; }
+
+  const W = 760, H = 380, padL = 6, padR = 66, padT = 14, priceH = 250, volTop = 292, volH = 66;
+  const xs = i => padL + (W - padL - padR) * (n === 1 ? 0 : i / (n - 1));
+
+  const priceVals = [...close, ...ma5.filter(v => v != null), ...ma20.filter(v => v != null)];
+  let lo = Math.min(...priceVals), hi = Math.max(...priceVals);
+  const gap = (hi - lo) * 0.08 || 1; lo -= gap; hi += gap;
+  const py = v => padT + priceH * (1 - (v - lo) / (hi - lo));
+
+  const poly = arr => arr.map((v, i) => v == null ? null : `${xs(i).toFixed(1)},${py(v).toFixed(1)}`)
+                        .filter(Boolean).join(' ');
+
+  // 가격 가로 그리드 + 라벨(우측)
+  let grid = '';
+  for (let k = 0; k <= 4; k++) {
+    const val = lo + (hi - lo) * k / 4;
+    const yy = py(val);
+    grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#1E293B"/>`;
+    grid += `<text x="${W - padR + 6}" y="${(yy + 3).toFixed(1)}" fill="#64748B" font-size="10">${Math.round(val).toLocaleString()}</text>`;
+  }
+
+  // 거래량 막대 (상승일 빨강 / 하락일 파랑)
+  const vmax = Math.max(...vol, 1);
+  const bw = Math.max(1, (W - padL - padR) / n * 0.6);
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const h = volH * (vol[i] / vmax);
+    const up = i === 0 ? true : close[i] >= close[i - 1];
+    bars += `<rect x="${(xs(i) - bw / 2).toFixed(1)}" y="${(volTop + volH - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${up ? '#EF4444' : '#3B82F6'}" opacity="0.55"/>`;
+  }
+
+  const last = close[n - 1], first = close[0];
+  const chgPct = ((last - first) / first * 100);
+  const lastColor = last >= first ? '#EF4444' : '#3B82F6';
+  const lx = xs(n - 1), ly = py(last);
+
+  const midIdx = Math.floor((n - 1) / 2);
+  const xlabels = [0, midIdx, n - 1].map(i =>
+    `<text x="${xs(i).toFixed(1)}" y="${H - 4}" fill="#64748B" font-size="10" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${dates[i].slice(2)}</text>`).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:0.95rem;font-weight:700">${d.ticker_name} 최근 ${n}거래일</div>
+      <div style="font-size:0.85rem">
+        <span style="color:#94A3B8">현재가</span>
+        <b>${last.toLocaleString()}원</b>
+        <span style="color:${lastColor};margin-left:6px">${chgPct >= 0 ? '▲' : '▼'}${Math.abs(chgPct).toFixed(2)}% (기간)</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;font-size:0.75rem;color:#94A3B8;margin-bottom:6px">
+      <span><span style="color:#E2E8F0">━</span> 종가</span>
+      <span><span style="color:#22C55E">━</span> MA5</span>
+      <span><span style="color:#FBBF24">━</span> MA20</span>
+      <span style="margin-left:auto"><span style="color:#EF4444">▮</span>/<span style="color:#3B82F6">▮</span> 거래량(상승/하락)</span>
+    </div>
+    <div style="overflow-x:auto">
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;background:#0F172A;border-radius:8px" xmlns="http://www.w3.org/2000/svg">
+      ${grid}
+      ${bars}
+      <polyline points="${poly(ma20)}" fill="none" stroke="#FBBF24" stroke-width="1.3" opacity="0.9"/>
+      <polyline points="${poly(ma5)}" fill="none" stroke="#22C55E" stroke-width="1.3" opacity="0.9"/>
+      <polyline points="${poly(close)}" fill="none" stroke="#E2E8F0" stroke-width="1.8"/>
+      <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="${lastColor}"/>
+      <text x="${(lx - 6).toFixed(1)}" y="${(ly - 8).toFixed(1)}" fill="${lastColor}" font-size="11" font-weight="700" text-anchor="end">${last.toLocaleString()}</text>
+      ${xlabels}
+    </svg>
+    </div>
+    <div style="text-align:right;margin-top:8px">
+      <button class="btn btn-sm" onclick="loadChart()">🔄 새로고침</button>
+    </div>`;
 }
 
 async function loadLogs() {

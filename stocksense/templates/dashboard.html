@@ -104,12 +104,16 @@
 
     <div class="tabs">
       <div class="tab active" onclick="switchTab('prediction')">예측</div>
-      <div class="tab" onclick="switchTab('history')">백테스트 기록</div>
+      <div class="tab" onclick="loadChart()">주가 차트</div>
+      <div class="tab" onclick="loadHistory()">백테스트 기록</div>
       <div class="tab" onclick="loadLogs()">실행 로그</div>
     </div>
 
     <div id="tab-prediction" class="tab-content active">
       <div id="prediction-content"><div class="loading">종목을 선택하고 예측 조회를 누르세요.</div></div>
+    </div>
+    <div id="tab-chart" class="tab-content">
+      <div id="chart-content"><div class="loading">주가 차트 탭을 눌러 차트를 불러오세요.</div></div>
     </div>
     <div id="tab-history" class="tab-content">
       <div id="history-content"><div class="loading">백테스트 버튼을 눌러 기록을 불러오세요.</div></div>

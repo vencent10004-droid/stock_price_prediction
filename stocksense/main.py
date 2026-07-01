@@ -18,7 +18,7 @@ _file_handler.setFormatter(logging.Formatter(_fmt))
 logging.basicConfig(level=logging.INFO, format=_fmt,
                     handlers=[logging.StreamHandler(), _file_handler])
 
-from routers import dashboard, predict_api, report_api, history_api, logs_api
+from routers import dashboard, predict_api, report_api, history_api, logs_api, chart_api
 
 _scheduler = None
 
@@ -49,6 +49,7 @@ app.include_router(predict_api.router)
 app.include_router(report_api.router)
 app.include_router(history_api.router)
 app.include_router(logs_api.router)
+app.include_router(chart_api.router)
 
 
 if __name__ == "__main__":
