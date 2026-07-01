@@ -34,15 +34,17 @@ def get_history(ticker_code: str):
         sig_map = flow_signal_map()
         for r in results:
             r["signal"] = sig_map.get(r["date"], False)
-        correct = sum(1 for r in results if r["correct"])
-        accuracy = correct / len(results) if results else 0
+        # 정확도는 정답이 확정된 행(오늘 제외)만으로 계산
+        evaluated = [r for r in results if not r.get("pending")]
+        correct = sum(1 for r in evaluated if r["correct"])
+        accuracy = correct / len(evaluated) if evaluated else 0
 
         return {
             "ticker_code": ticker_code,
-            "total": len(results),
+            "total": len(evaluated),
             "correct": correct,
             "accuracy": round(accuracy, 4),
-            "records": results[-30:],  # 최근 30일만
+            "records": results[-30:],  # 최근 30일만 (오늘 예측대기 행 포함)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

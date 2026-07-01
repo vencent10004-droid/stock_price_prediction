@@ -204,15 +204,34 @@ async function loadHistory() {
 
 function renderHistory(el, d) {
   const pct = (d.accuracy * 100).toFixed(1);
-  const rows = (d.records || []).slice().reverse().map(r => `
-    <tr style="${r.signal ? 'background:#7F1D1D33' : ''}">
-      <td>${r.date}</td>
+  const rows = (d.records || []).slice().reverse().map(r => {
+    let arrow = '';
+    if (typeof r.chg_pct === 'number' && r.chg_pct > 0)
+      arrow = ` <span class="up">▲${r.chg_pct.toFixed(2)}%</span>`;
+    else if (typeof r.chg_pct === 'number' && r.chg_pct < 0)
+      arrow = ` <span class="down">▼${Math.abs(r.chg_pct).toFixed(2)}%</span>`;
+    const closeTxt = (r.close != null)
+      ? Number(r.close).toLocaleString() + '원' + arrow
+        + (r.pending ? ' <span style="color:#FBBF24;font-size:0.7rem">(현재가)</span>' : '')
+      : '-';
+    const actualCell = r.pending
+      ? '<span class="neutral">예측 대기</span>'
+      : `<span class="${r.actual === '상승' ? 'up' : 'down'}">${r.actual}</span>`;
+    const correctCell = r.pending
+      ? '<span class="neutral">—</span>'
+      : `<span class="${r.correct ? 'correct' : 'wrong'}">${r.correct ? '✓' : '✗'}</span>`;
+    const rowBg = r.pending ? 'background:#0B2A4A' : (r.signal ? 'background:#7F1D1D33' : '');
+    return `
+    <tr style="${rowBg}">
+      <td>${r.date}${r.pending ? ' <span style="color:#FBBF24;font-size:0.7rem">오늘</span>' : ''}</td>
       <td class="${r.predicted === '상승' ? 'up' : 'down'}">${r.predicted}</td>
-      <td class="${r.actual === '상승' ? 'up' : 'down'}">${r.actual}</td>
-      <td class="${r.correct ? 'correct' : 'wrong'}">${r.correct ? '✓' : '✗'}</td>
+      <td>${actualCell}</td>
+      <td>${closeTxt}</td>
+      <td style="text-align:center">${correctCell}</td>
       <td>${(r.prob * 100).toFixed(1)}%</td>
       <td style="text-align:center">${r.signal ? '<span title="외국인 선물+콜옵션 동반 순매수">⭐</span>' : ''}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   const sigCount = (d.records || []).filter(r => r.signal).length;
 
   el.innerHTML = `
@@ -225,7 +244,7 @@ function renderHistory(el, d) {
     <div style="font-size:0.78rem;color:#94A3B8;margin-bottom:10px">⭐ = 외국인 선물 + 콜옵션 동반 순매수일 (과거 이 조건 다음날 상승 72%)</div>
     <div style="overflow-x:auto">
       <table class="history-table">
-        <thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>정오</th><th>신뢰도</th><th>신호</th></tr></thead>
+        <thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>종가</th><th>정오</th><th>신뢰도</th><th>신호</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;

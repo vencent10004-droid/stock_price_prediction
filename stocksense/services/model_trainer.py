@@ -107,28 +107,32 @@ def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
 
     models, names, scaler, features = load_models(ticker_code)
     feature_cols = [c for c in features if c in df.columns]
-    df = df[df["target"].notna()]           # 정답 미정(마지막) 행 제외
     X = df[feature_cols].values
-    y = df["target"].astype(int).values
+    y = df["target"].values                 # 마지막(오늘) 행은 NaN → 정답 미정
+    closes = df["close"].values
     dates = df.index
 
     n = len(X)
     valid_end = int(n * 0.85)
-    X_test = X[valid_end:]
-    y_test = y[valid_end:]
-    test_dates = dates[valid_end:]
-
-    X_test_s = scaler.transform(X_test)
+    X_test_s = scaler.transform(X[valid_end:])
     final_prob = np.mean([m.predict_proba(X_test_s)[:, 1] for m in models], axis=0)
 
     results = []
-    for i, (d, prob, actual) in enumerate(zip(test_dates, final_prob, y_test)):
+    for j in range(valid_end, n):
+        prob = float(final_prob[j - valid_end])
         predicted = 1 if prob >= 0.5 else 0
+        actual = y[j]
+        pending = actual != actual          # NaN 판별(다음날 데이터 없음)
+        prev = closes[j - 1] if j > 0 else closes[j]
+        chg_pct = ((closes[j] - prev) / prev * 100) if prev else 0.0
         results.append({
-            "date": str(d.date()),
+            "date": str(dates[j].date()),
             "predicted": "상승" if predicted == 1 else "하락",
-            "actual": "상승" if actual == 1 else "하락",
-            "correct": bool(predicted == actual),
-            "prob": round(float(prob), 4),
+            "actual": None if pending else ("상승" if actual == 1 else "하락"),
+            "correct": None if pending else bool(predicted == int(actual)),
+            "prob": round(prob, 4),
+            "close": int(closes[j]),         # 그날 종가(오늘은 현재가)
+            "chg_pct": round(float(chg_pct), 2),  # 전일 종가 대비 변화율(%)
+            "pending": bool(pending),        # True = 오늘, 정답 미정
         })
     return results
