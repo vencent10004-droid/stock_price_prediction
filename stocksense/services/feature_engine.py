@@ -230,7 +230,10 @@ def build_features(stock_df: pd.DataFrame, market_data: dict = None,
     df["sentiment_score"] = sentiment_score
 
     # ── 타겟: 내일 종가 > 오늘 종가 ──
-    df["target"] = (df["close"].shift(-1) > df["close"]).astype(int)
+    # 마지막 행은 다음날 데이터가 없어 정답 미정 → NaN (학습·백테스트에서 제외, 예측용 피처는 유지)
+    _next_close = df["close"].shift(-1)
+    df["target"] = (_next_close > df["close"]).astype(float)
+    df.loc[_next_close.isna(), "target"] = np.nan
 
     # 핵심 피처가 있는 행만 유지 (시장/감성 피처 NaN은 0으로 채움)
     market_cols = [c for c in df.columns if c.endswith("_return") and c != "return_1d"]

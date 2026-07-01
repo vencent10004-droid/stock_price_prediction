@@ -48,8 +48,9 @@ def train(ticker_code: str, df: pd.DataFrame, config: dict = None) -> dict:
     반환: {"accuracy": ..., "report": ..., "n_train": ..., "n_test": ...}
     """
     feature_cols = [c for c in FEATURE_COLS if c in df.columns]
+    df = df[df["target"].notna()]           # 정답 미정(마지막) 행 제외
     X = df[feature_cols].values
-    y = df["target"].values
+    y = df["target"].astype(int).values
 
     # 시계열 분리 (70/15/15) — train으로 학습, test로 평가 (valid는 구성 선택용 여유분)
     n = len(X)
@@ -106,8 +107,9 @@ def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
 
     models, names, scaler, features = load_models(ticker_code)
     feature_cols = [c for c in features if c in df.columns]
+    df = df[df["target"].notna()]           # 정답 미정(마지막) 행 제외
     X = df[feature_cols].values
-    y = df["target"].values
+    y = df["target"].astype(int).values
     dates = df.index
 
     n = len(X)
