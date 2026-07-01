@@ -124,6 +124,7 @@ def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
         actual = y[j]
         pending = actual != actual          # NaN 판별(다음날 데이터 없음)
         prev = closes[j - 1] if j > 0 else closes[j]
+        chg_amt = int(closes[j] - prev)
         chg_pct = ((closes[j] - prev) / prev * 100) if prev else 0.0
         results.append({
             "date": str(dates[j].date()),
@@ -132,6 +133,7 @@ def backtest(ticker_code: str, df: pd.DataFrame) -> list[dict]:
             "correct": None if pending else bool(predicted == int(actual)),
             "prob": round(prob, 4),
             "close": int(closes[j]),         # 그날 종가(오늘은 현재가)
+            "chg_amt": chg_amt,              # 전일 대비 변화 금액(원)
             "chg_pct": round(float(chg_pct), 2),  # 전일 종가 대비 변화율(%)
             "pending": bool(pending),        # True = 오늘, 정답 미정
         })

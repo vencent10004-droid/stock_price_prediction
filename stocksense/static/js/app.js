@@ -206,10 +206,11 @@ function renderHistory(el, d) {
   const pct = (d.accuracy * 100).toFixed(1);
   const rows = (d.records || []).slice().reverse().map(r => {
     let arrow = '';
+    const amt = (typeof r.chg_amt === 'number') ? Math.abs(r.chg_amt).toLocaleString() : '';
     if (typeof r.chg_pct === 'number' && r.chg_pct > 0)
-      arrow = ` <span class="up">▲${r.chg_pct.toFixed(2)}%</span>`;
+      arrow = ` <span class="up">▲${r.chg_pct.toFixed(2)}% (+${amt}원)</span>`;
     else if (typeof r.chg_pct === 'number' && r.chg_pct < 0)
-      arrow = ` <span class="down">▼${Math.abs(r.chg_pct).toFixed(2)}%</span>`;
+      arrow = ` <span class="down">▼${Math.abs(r.chg_pct).toFixed(2)}% (-${amt}원)</span>`;
     const closeTxt = (r.close != null)
       ? Number(r.close).toLocaleString() + '원' + arrow
         + (r.pending ? ' <span style="color:#FBBF24;font-size:0.7rem">(현재가)</span>' : '')
