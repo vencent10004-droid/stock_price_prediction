@@ -100,8 +100,8 @@ function renderChart(el, d) {
       <span><span style="color:#FBBF24">━</span> MA20</span>
       <span style="margin-left:auto"><span style="color:#EF4444">▮</span>/<span style="color:#3B82F6">▮</span> 거래량(상승/하락)</span>
     </div>
-    <div style="overflow-x:auto">
-    <svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;background:#0F172A;border-radius:8px" xmlns="http://www.w3.org/2000/svg">
+    <div id="cht-wrap" style="position:relative;overflow-x:auto">
+    <svg id="cht-svg" viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;background:#0F172A;border-radius:8px;cursor:crosshair;display:block" xmlns="http://www.w3.org/2000/svg">
       ${grid}
       ${bars}
       <polyline points="${poly(ma20)}" fill="none" stroke="#FBBF24" stroke-width="1.3" opacity="0.9"/>
@@ -110,11 +110,55 @@ function renderChart(el, d) {
       <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="${lastColor}"/>
       <text x="${(lx - 6).toFixed(1)}" y="${(ly - 8).toFixed(1)}" fill="${lastColor}" font-size="11" font-weight="700" text-anchor="end">${last.toLocaleString()}</text>
       ${xlabels}
+      <line id="cht-cx" x1="0" x2="0" y1="${padT}" y2="${volTop + volH}" stroke="#94A3B8" stroke-width="1" stroke-dasharray="4 3" opacity="0" pointer-events="none"/>
+      <circle id="cht-cdot" r="4" fill="#E2E8F0" stroke="#0F172A" stroke-width="1.5" opacity="0" pointer-events="none"/>
     </svg>
+    <div id="cht-tip" style="position:absolute;display:none;pointer-events:none;background:#1E293B;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:0.75rem;line-height:1.55;box-shadow:0 4px 14px rgba(0,0,0,0.5);z-index:5;white-space:nowrap"></div>
     </div>
     <div style="text-align:right;margin-top:8px">
       <button class="btn btn-sm" onclick="loadChart()">🔄 새로고침</button>
     </div>`;
+
+  // ── 크로스헤어(확인선) + 툴팁 상호작용 ──
+  const svg = document.getElementById("cht-svg");
+  const wrap = document.getElementById("cht-wrap");
+  const cx = document.getElementById("cht-cx");
+  const cdot = document.getElementById("cht-cdot");
+  const tip = document.getElementById("cht-tip");
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const vbX = (clientX - rect.left) / rect.width * W;      // 화면px → viewBox좌표
+    let i = Math.round((vbX - padL) / (W - padL - padR) * (n - 1));
+    i = Math.max(0, Math.min(n - 1, i));
+    const X = xs(i), Y = py(close[i]);
+    cx.setAttribute("x1", X); cx.setAttribute("x2", X); cx.setAttribute("opacity", "1");
+    cdot.setAttribute("cx", X); cdot.setAttribute("cy", Y); cdot.setAttribute("opacity", "1");
+
+    const c = close[i], prev = i > 0 ? close[i - 1] : c;
+    const chg = c - prev, chgp = prev ? chg / prev * 100 : 0;
+    const col = chg >= 0 ? "#EF4444" : "#3B82F6";
+    tip.innerHTML = `
+      <div style="font-weight:700;margin-bottom:2px">${dates[i]}</div>
+      <div>종가 <b>${c.toLocaleString()}원</b> <span style="color:${col}">${chg >= 0 ? '▲' : '▼'}${Math.abs(chgp).toFixed(2)}%</span></div>
+      <div style="color:#22C55E">MA5 ${ma5[i] != null ? Math.round(ma5[i]).toLocaleString() : '-'}</div>
+      <div style="color:#FBBF24">MA20 ${ma20[i] != null ? Math.round(ma20[i]).toLocaleString() : '-'}</div>
+      <div style="color:#94A3B8">거래량 ${vol[i].toLocaleString()}</div>`;
+    tip.style.display = "block";
+
+    const wrapRect = wrap.getBoundingClientRect();
+    let left = (clientX - wrapRect.left) + wrap.scrollLeft + 14;
+    if (left > wrap.clientWidth + wrap.scrollLeft - tip.offsetWidth - 6)
+      left = (clientX - wrapRect.left) + wrap.scrollLeft - tip.offsetWidth - 14;
+    tip.style.left = Math.max(2, left) + "px";
+    tip.style.top = "6px";
+  }
+  function hide() { cx.setAttribute("opacity", "0"); cdot.setAttribute("opacity", "0"); tip.style.display = "none"; }
+
+  svg.addEventListener("mousemove", e => showAt(e.clientX));
+  svg.addEventListener("mouseleave", hide);
+  svg.addEventListener("touchmove", e => { if (e.touches[0]) { showAt(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
+  svg.addEventListener("touchend", hide);
 }
 
 async function loadLogs() {
