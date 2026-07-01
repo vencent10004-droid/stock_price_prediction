@@ -59,6 +59,88 @@ function toggleInd(k) {
   if (lastChartData) renderChart(document.getElementById("chart-content"), lastChartData);
 }
 
+function buildChartInsight(a) {
+  const { close, ma5, ma20, bbU, bbL, rsi, hist, vol, n, chgPct, UP, DOWN } = a;
+  const lastVal = arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i]; return null; };
+  const c = close[n - 1], m5 = lastVal(ma5), m20 = lastVal(ma20), rv = lastVal(rsi), hv = lastVal(hist);
+  const bu = lastVal(bbU), bl = lastVal(bbL);
+
+  // 추세 (이동평균 배열 + 종가 위치)
+  let trend = "혼조/횡보", tcol = "#94A3B8";
+  if (m5 != null && m20 != null) {
+    if (c >= m20 && m5 >= m20) { trend = "상승 추세"; tcol = UP; }
+    else if (c < m20 && m5 < m20) { trend = "하락 추세"; tcol = DOWN; }
+  }
+
+  const bullets = [];
+  // 이동평균 배열 상태
+  if (m5 != null && m20 != null) {
+    bullets.push(m5 >= m20
+      ? `단기선(MA5)이 중기선(MA20) <b style="color:${UP}">위</b> — 단기 상승 우위`
+      : `단기선(MA5)이 중기선(MA20) <b style="color:${DOWN}">아래</b> — 단기 약세`);
+  }
+  // 골든/데드크로스 (최근 6봉)
+  if (ma5.length === n && ma20.length === n) {
+    for (let i = n - 1; i >= Math.max(1, n - 6); i--) {
+      if (ma5[i] != null && ma20[i] != null && ma5[i - 1] != null && ma20[i - 1] != null) {
+        const now = ma5[i] - ma20[i], prev = ma5[i - 1] - ma20[i - 1];
+        if (prev <= 0 && now > 0) { bullets.push(`⭐ 최근 <b style="color:${UP}">골든크로스</b> 발생 — 상승 전환 신호`); break; }
+        if (prev >= 0 && now < 0) { bullets.push(`⚠️ 최근 <b style="color:${DOWN}">데드크로스</b> 발생 — 하락 전환 신호`); break; }
+      }
+    }
+  }
+  // MACD
+  if (hv != null) bullets.push(hv > 0
+    ? `MACD 히스토그램 <b style="color:${UP}">양(+)</b> — 상승 모멘텀 우위`
+    : `MACD 히스토그램 <b style="color:${DOWN}">음(−)</b> — 하락 모멘텀 우위`);
+  // RSI
+  if (rv != null) bullets.push(rv >= 70
+    ? `RSI <b style="color:${UP}">${rv.toFixed(0)}</b> — 과매수 구간, 단기 조정 주의`
+    : rv <= 30 ? `RSI <b style="color:${DOWN}">${rv.toFixed(0)}</b> — 과매도 구간, 반등 가능성`
+    : `RSI ${rv.toFixed(0)} — 중립 구간`);
+  // 볼린저 위치
+  if (bu != null && bl != null && bu > bl) {
+    const pos = (c - bl) / (bu - bl);
+    if (pos >= 0.8) bullets.push(`주가가 볼린저 <b style="color:${UP}">상단</b> 부근 — 단기 과열 가능`);
+    else if (pos <= 0.2) bullets.push(`주가가 볼린저 <b style="color:${DOWN}">하단</b> 부근 — 낙폭 과대 가능`);
+    else bullets.push(`주가가 볼린저 중앙권 — 추세 방향 확인 필요`);
+  }
+  // 거래량
+  if (vol.length) {
+    const k = Math.min(5, vol.length);
+    const recent = vol.slice(-k).reduce((x, y) => x + y, 0) / k;
+    const base = vol.reduce((x, y) => x + y, 0) / vol.length;
+    if (base > 0) {
+      const r = recent / base;
+      bullets.push(r > 1.3 ? `최근 거래량 <b>증가</b> (평균 대비 ${r.toFixed(1)}배) — 관심 유입`
+        : r < 0.7 ? `최근 거래량 <b>감소</b> — 관망세` : `거래량 평균 수준`);
+    }
+  }
+
+  const summary = `최근 ${n}거래일 <b style="color:${chgPct >= 0 ? UP : DOWN}">${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(1)}%</b>, `
+    + `현재 <b style="color:${tcol}">${trend}</b>로 판단됩니다. 지표들은 ${bulletsBias(bullets, UP, DOWN)}.`;
+
+  return `
+    <div style="background:#0F172A;border:1px solid #1E293B;border-left:3px solid #3B82F6;border-radius:8px;padding:14px 16px;margin-top:12px">
+      <div style="font-size:0.9rem;font-weight:700;margin-bottom:8px">📈 차트 해석 <span style="font-size:0.72rem;color:#64748B;font-weight:400">· AI 기술적 분석</span></div>
+      <div style="font-size:0.86rem;line-height:1.6;color:#CBD5E1;margin-bottom:10px">${summary}</div>
+      <ul style="margin:0 0 8px 18px;padding:0;font-size:0.82rem;line-height:1.7;color:#CBD5E1">
+        ${bullets.map(b => `<li>${b}</li>`).join('')}
+      </ul>
+      <div style="font-size:0.72rem;color:#64748B">※ 과거 데이터 기반 기술적 참고 해석이며, 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.</div>
+    </div>`;
+}
+
+// 상승/하락 신호 개수로 종합 편향 문구
+function bulletsBias(bullets, UP, DOWN) {
+  const txt = bullets.join(" ");
+  const up = (txt.match(new RegExp(UP, "g")) || []).length;
+  const dn = (txt.match(new RegExp(DOWN, "g")) || []).length;
+  if (up > dn) return `<b style="color:${UP}">상승 우호적 신호</b>가 우세합니다`;
+  if (dn > up) return `<b style="color:${DOWN}">하락 경계 신호</b>가 우세합니다`;
+  return `상승·하락 신호가 <b>혼재</b>합니다`;
+}
+
 function renderChart(el, d) {
   const close = d.close || [], dates = d.dates || [], ma5 = d.ma5 || [], ma20 = d.ma20 || [], vol = d.volume || [];
   const open = d.open || [], high = d.high || [], low = d.low || [];
@@ -184,6 +266,8 @@ function renderChart(el, d) {
   const tBtn = (tv, lbl) => `<button class="btn btn-sm" onclick="setChartType('${tv}')" style="${chartType === tv ? on : ''}">${lbl}</button>`;
   const iBtn = (kv, lbl, active) => `<button class="btn btn-sm" onclick="toggleInd('${kv}')" style="${active ? on : ''}">${lbl}</button>`;
 
+  const insight = buildChartInsight({ close, ma5, ma20, bbU, bbL, rsi, hist, vol, n, chgPct, UP, DOWN });
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
       <div style="font-size:0.95rem;font-weight:700">${d.ticker_name} 최근 ${n}거래일</div>
@@ -221,6 +305,7 @@ function renderChart(el, d) {
     </svg>
     <div id="cht-tip" style="position:absolute;display:none;pointer-events:none;background:#1E293B;border:1px solid #334155;border-radius:6px;padding:8px 10px;font-size:0.75rem;line-height:1.55;box-shadow:0 4px 14px rgba(0,0,0,0.5);z-index:5;white-space:nowrap"></div>
     </div>
+    ${insight}
     <div style="text-align:right;margin-top:8px">
       <button class="btn btn-sm" onclick="loadChart()">🔄 새로고침</button>
     </div>`;
