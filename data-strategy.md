@@ -17,7 +17,7 @@ KOSPI / 나스닥 / 환율  →    FinanceDataReader     →  data/raw/
                               ↓
                       [피처 엔지니어링]
                       기술적 지표 계산
-                      감성 점수 계산 (Google Gemini)
+                      감성 점수 계산 (Claude(Anthropic))
                       외국인/기관 파생 피처
                               ↓
                       data/features/{ticker}.csv
@@ -130,10 +130,10 @@ def fetch_naver_news(ticker_code: str, ticker_name: str, max_articles=10) -> lis
     # 종목명이 제목/본문에 포함된 기사를 상위로 정렬
     ...
 
-# 2. Google Gemini REST API로 감성 분석
-import requests
+# 2. Claude(Anthropic) API로 감성 분석 (공식 anthropic SDK)
+import anthropic
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+CLAUDE_MODEL = "claude-opus-4-8"
 
 def analyze_sentiment(ticker_name: str, headlines: list[dict]) -> dict:
     titles = [h["title"] for h in headlines]
@@ -141,10 +141,11 @@ def analyze_sentiment(ticker_name: str, headlines: list[dict]) -> dict:
 각 헤드라인을 긍정(+1)/중립(0)/부정(-1)으로 분류하고,
 전체 점수(-1.0~+1.0)와 한 줄 요약을 JSON으로 반환하세요.
 헤드라인: {titles}"""
-    resp = requests.post(GEMINI_URL, params={"key": API_KEY},
-                         json={"contents": [{"parts": [{"text": prompt}]}]},
-                         timeout=60)  # 타임아웃 60초 + 재시도
-    return json.loads(resp.json()["candidates"][0]["content"]["parts"][0]["text"])
+    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경변수 사용 (SDK가 자동 재시도)
+    resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=1024,
+                                  messages=[{"role": "user", "content": prompt}])
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return json.loads(text)
 ```
 
 ### 2-8. 시간 피처 (3개)

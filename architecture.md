@@ -26,7 +26,7 @@
 │                     피처 엔지니어링 레이어                          │
 │  ┌──────────────────┐          ┌──────────────────────────────┐  │
 │  │FeatureEngine     │          │SentimentAnalyzer             │  │
-│  │RSI/MACD/볼린저   │          │Gemini API로 뉴스 감성 분석    │  │
+│  │RSI/MACD/볼린저   │          │Claude API로 뉴스 감성 분석    │  │
 │  │이동평균/ATR 계산  │          │감성 점수 → 피처로 변환        │  │
 │  └────────┬─────────┘          └─────────────┬────────────────┘  │
 └───────────┼───────────────────────────────────┼───────────────────┘
@@ -47,7 +47,7 @@
 │                      리포트 생성 레이어                              │
 │  ┌────────────────────────────────────────────────────────────┐   │
 │  │  ReportGenerator                                           │   │
-│  │  ① Gemini AI → 종합 코멘트 문장 생성                        │   │
+│  │  ① Claude → 종합 코멘트 문장 생성                        │   │
 │  │  ② matplotlib → 주가 차트 PNG 생성                          │   │
 │  │  ③ reportlab → PDF 애널리스트 리포트 조합                    │   │
 │  └───────────────────────────┬────────────────────────────────┘   │
@@ -85,7 +85,7 @@ stocksense/
 │   ├── data_collector.py           # FinanceDataReader 데이터 수집
 │   ├── krx_collector.py            # pykrx 외국인/기관 수집
 │   ├── news_crawler.py             # 네이버 모바일 뉴스 API (제목+링크, 관련성 정렬)
-│   ├── sentiment_analyzer.py       # Gemini API 감성 분석 + 코멘트 생성
+│   ├── sentiment_analyzer.py       # Claude API 감성 분석 + 코멘트 생성
 │   ├── feature_engine.py           # 기술적 지표 + 피처 계산
 │   ├── direction_predictor.py      # 방향 예측 (RF + XGB 앙상블)
 │   ├── price_range_estimator.py    # 가격대 예측 (ATR + 볼린저)
@@ -127,7 +127,7 @@ stocksense/
 │   └── js/app.js
 │
 ├── requirements.txt
-└── .env                            # GEMINI_API_KEY, 이메일 설정
+└── .env                            # ANTHROPIC_API_KEY, 이메일 설정
 ```
 
 ---
@@ -225,10 +225,10 @@ scheduler.add_job(
 **`run_daily_pipeline` 실행 순서:**
 ```
 1. 전체 종목 데이터 수집 (FinanceDataReader + pykrx)
-2. 뉴스 수집 + Gemini 감성 분석
+2. 뉴스 수집 + Claude 감성 분석
 3. 피처 계산
 4. 방향 예측 + 가격대 예측
-5. Gemini AI 코멘트 생성
+5. Claude 코멘트 생성
 6. PDF 리포트 생성
 7. 이메일 전송 (HTML 본문 + PDF 첨부)
 8. 예측 결과 로그 저장
@@ -276,7 +276,7 @@ email:
 ## 6. `.env` 파일
 
 ```env
-GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxx
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
 
 # 이메일 발송 설정 (Gmail SMTP 기준)
 EMAIL_SENDER=your_email@gmail.com

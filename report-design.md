@@ -261,6 +261,6 @@
 |------|------|
 | PDF 생성 | reportlab (Python) |
 | HTML → PDF | Edge 헤드리스 (백업) |
-| AI 코멘트 작성 | Google Gemini (gemini-2.5-flash) |
+| AI 코멘트 작성 | Claude(Anthropic) (claude-opus-4-8) |
 | 차트 이미지 | matplotlib → PNG → PDF 삽입 |
 | 이메일 전송 | smtplib + email (Python 표준 라이브러리, 추가 설치 불필요) |

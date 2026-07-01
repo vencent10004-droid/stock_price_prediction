@@ -49,7 +49,7 @@
 
 ### 2.1 제품 관점 (Product Perspective)
 StockSense는 단일 서버에서 동작하는 웹 애플리케이션이다. 사용자는 웹 브라우저로 접속하며,
-서버(FastAPI)는 외부 데이터 소스(한국거래소·네이버 뉴스·Google Gemini)와 연동하여 예측을 수행한다.
+서버(FastAPI)는 외부 데이터 소스(한국거래소·네이버 뉴스·Claude(Anthropic))와 연동하여 예측을 수행한다.
 APScheduler가 매일 자동 파이프라인을 실행한다.
 
 ```
@@ -63,7 +63,7 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
 - 기술적 지표 및 뉴스 감성 점수 기반 피처 생성
 - RF + XGBoost 앙상블로 내일 주가 방향(상승/하락) 및 신뢰도 예측
 - 가격대 시나리오(상승/하락) 및 지지·저항선 산출
-- Google Gemini 기반 뉴스 감성 분석 + 애널리스트 코멘트 생성
+- Claude(Anthropic) 기반 뉴스 감성 분석 + 애널리스트 코멘트 생성
 - PDF 애널리스트 리포트 자동 생성 및 이메일 발송
 - 웹 대시보드(예측·백테스트·리포트 다운로드)
 - 매주 1회 모델 자동 재학습
@@ -77,15 +77,15 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
 
 ### 2.4 제약 조건 (Constraints)
 - 실행 환경: Python 3.11+ (Windows / macOS), 24시간 구동 서버 권장
-- 외부 의존: 한국거래소(FinanceDataReader·pykrx), 네이버 모바일 뉴스 API, Google Gemini API
-- Gemini API 사용에 따른 소액 비용 발생
+- 외부 의존: 한국거래소(FinanceDataReader·pykrx), 네이버 모바일 뉴스 API, Claude(Anthropic) API
+- Claude API 사용에 따른 소액 비용 발생
 - 예측은 **참고용**이며 투자 자문이 아님 (면책 고지 필수 표기)
 
 ### 2.5 가정 및 의존성 (Assumptions and Dependencies)
 - 네트워크 연결이 안정적이며 외부 API가 정상 응답한다고 가정
 - 예측 대상 종목의 과거 3년 주가 데이터가 존재
 - 종목별 학습 모델(`models/{code}/`)이 사전에 학습되어 있음
-- `.env`에 `GEMINI_API_KEY` 및 이메일 설정이 입력되어 있음
+- `.env`에 `ANTHROPIC_API_KEY` 및 이메일 설정이 입력되어 있음
 
 ---
 
@@ -96,11 +96,11 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
 | FR-01 | 시스템은 종목별 3년치 OHLCV 및 KOSPI·나스닥·환율을 수집해야 한다. | Must | FinanceDataReader |
 | FR-02 | 시스템은 외국인·기관 순매수(수급) 데이터를 수집해야 한다. | Must | pykrx |
 | FR-03 | 시스템은 종목 관련 뉴스 헤드라인과 원문 링크를 수집하고, 회사 관련성이 높은 기사를 우선 정렬해야 한다. | Must | 네이버 모바일 뉴스 API |
-| FR-04 | 시스템은 뉴스 헤드라인을 긍정/중립/부정으로 분석하고 감성 점수를 산출해야 한다. | Must | Google Gemini |
+| FR-04 | 시스템은 뉴스 헤드라인을 긍정/중립/부정으로 분석하고 감성 점수를 산출해야 한다. | Must | Claude(Anthropic) |
 | FR-05 | 시스템은 기술적 지표(RSI·MACD·볼린저·이동평균·ATR)와 감성 점수로 피처를 생성해야 한다. | Must | feature_engine |
 | FR-06 | 시스템은 RF+XGBoost 앙상블로 내일 방향(상승/하락)과 신뢰도(확률)를 예측해야 한다. | Must | 이진 분류 |
 | FR-07 | 시스템은 상승/하락 시나리오별 가격대와 지지·저항선을 산출해야 한다. | Must | ATR·볼린저·피벗 |
-| FR-08 | 시스템은 예측·지표·감성을 종합한 애널리스트 코멘트를 생성해야 한다. | Must | Gemini, 실패 시 규칙 기반 대체 |
+| FR-08 | 시스템은 예측·지표·감성을 종합한 애널리스트 코멘트를 생성해야 한다. | Must | Claude, 실패 시 규칙 기반 대체 |
 | FR-09 | 시스템은 종목별 PDF 애널리스트 리포트를 생성해야 한다. | Must | reportlab |
 | FR-10 | 시스템은 매일 16:30 전체 파이프라인을 자동 실행하고 결과를 이메일(HTML 본문 + PDF 첨부)로 발송해야 한다. | Should | APScheduler + SMTP |
 | FR-11 | 시스템은 매주 일요일 02:00 전 종목 모델을 자동 재학습해야 한다. | Should | APScheduler |
@@ -120,7 +120,7 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
 | NFR-01 | 단일 종목 예측 응답 시간 | 30~60초 이내 | 데이터 수집 + AI 호출 포함 |
 | NFR-02 | PDF 리포트 생성 시간 | 종목당 1분 이내 | |
 | NFR-03 | 방향 예측 정확도(백테스트) | 55% 이상 목표 | 종목별 상이 |
-| NFR-04 | 외부 API 호출 안정성 | Gemini 타임아웃 60초 + 재시도 2회 | 일시적 실패 대응 |
+| NFR-04 | 외부 API 호출 안정성 | anthropic SDK 자동 재시도(기본 2회) + 실패 시 규칙 기반 대체 | 일시적 실패 대응 |
 | NFR-05 | 이메일 전송 실패 처리 | 실패 시 재시도(최대 2회) | |
 | NFR-06 | 가용성 | 스케줄러 24시간 구동 | 서버 상시 가동 권장 |
 | NFR-07 | 유지보수성 | 종목·스케줄·이메일 설정을 config로 분리 | 코드 수정 불필요 |
@@ -147,7 +147,7 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
 | 백엔드 | Python · FastAPI · Uvicorn · APScheduler |
 | 프런트엔드 | HTML · CSS · JavaScript (Jinja2 템플릿) |
 | 데이터 수집 | FinanceDataReader, pykrx, 네이버 모바일 뉴스 API |
-| AI/ML | scikit-learn(RandomForest), XGBoost, Google Gemini(REST) |
+| AI/ML | scikit-learn(RandomForest), XGBoost, Claude(Anthropic)(REST) |
 | 리포트/메일 | reportlab, matplotlib, smtplib(SMTP) |
 | 데이터베이스 | (현재 파일 기반: .pkl·CSV·YAML) MariaDB/PostgreSQL 도입은 향후 과제 |
 
@@ -177,7 +177,7 @@ APScheduler가 매일 자동 파이프라인을 실행한다.
             report_generator · email_sender
                                   │
         ┌─────────────────────────┼──────────────────────────┐
-   [한국거래소/FDR]        [네이버 뉴스 API]          [Google Gemini]
+   [한국거래소/FDR]        [네이버 뉴스 API]          [Claude(Anthropic)]
    [pykrx 수급]            [ML 모델 RF+XGB(.pkl)]
 ```
 - 상세 구조도: [architecture.md](architecture.md), `StockSense_웹서비스_구조도_v2.png`

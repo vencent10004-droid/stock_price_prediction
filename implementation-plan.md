@@ -7,7 +7,7 @@
 > 변경되었다. 코드 스니펫 일부는 설계 당시의 의사코드이므로 실제 동작과 다를 수 있다.
 > - 주가 데이터: `yfinance` → **FinanceDataReader** (`fdr.DataReader("005930", ...)`)
 > - 뉴스 수집: BeautifulSoup HTML 크롤링 → **네이버 모바일 뉴스 API**(제목+원문 링크, 회사 관련성 정렬)
-> - 감성 분석/코멘트: Claude(anthropic) → **Google Gemini** (`gemini-2.5-flash`, REST API)
+> - 감성 분석/코멘트: **Claude(Anthropic)** (`claude-opus-4-8`, 공식 anthropic SDK)
 > - 발송: 텔레그램 → **이메일**(HTML 본문 + PDF 첨부)
 > - 종목: 6개 → **시가총액 상위 10개**, 일별 실행 16:00 → **16:30**
 
@@ -26,7 +26,7 @@
 - [x] 프로젝트 폴더 구조 생성
 - [x] 가상환경 생성 + 패키지 설치
 - [x] `.env`, `config/config.yaml` 작성
-- [x] Google Gemini API 키 연결 테스트
+- [x] Claude(Anthropic) API 키 연결 테스트
 - [x] 이메일(Gmail 앱 비밀번호) 설정 확인
 
 ### 설치 패키지
@@ -35,7 +35,7 @@ pip install finance-datareader pykrx pandas scikit-learn xgboost joblib
 pip install python-dotenv requests setuptools
 pip install fastapi uvicorn apscheduler jinja2
 pip install reportlab matplotlib pyyaml
-# 감성 분석: Google Gemini REST API를 requests로 직접 호출 (별도 SDK 불필요)
+# 감성 분석: Claude(Anthropic) 공식 anthropic SDK로 호출
 # 이메일 전송: smtplib + email 은 Python 표준 라이브러리 (별도 설치 불필요)
 ```
 
@@ -109,7 +109,8 @@ print('뉴스:', news[:3])
 
 ### 2-B. 뉴스 감성 분석 (`services/sentiment_analyzer.py`)
 ```python
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+import anthropic
+CLAUDE_MODEL = "claude-opus-4-8"
 
 def analyze_sentiment(ticker_name: str, headlines: list[dict]) -> dict:
     titles = [h["title"] for h in headlines]
@@ -121,10 +122,11 @@ JSON으로 반환: {{"overall_score": 0.42, "items": [...], "summary": "..."}}
 헤드라인:
 {chr(10).join(f"- {t}" for t in titles)}
 """
-    resp = requests.post(GEMINI_URL, params={"key": API_KEY},
-                         json={"contents": [{"parts": [{"text": prompt}]}]},
-                         timeout=60)  # 타임아웃 60초 + 재시도
-    return json.loads(resp.json()["candidates"][0]["content"]["parts"][0]["text"])
+    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경변수 사용 (SDK 자동 재시도)
+    resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=1024,
+                                  messages=[{"role": "user", "content": prompt}])
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return json.loads(text)
 ```
 - [ ] 감성 점수 → 피처 컬럼 추가
 
@@ -204,11 +206,11 @@ def generate_analyst_comment(prediction_data: dict, ticker_name: str) -> str:
 - 상승 요인과 하락 리스크 모두 언급
 - 마지막에 투자 의견 한 줄 요약
 """
-    resp = requests.post(GEMINI_URL, params={"key": API_KEY},
-                         json={"contents": [{"parts": [{"text": prompt}]}]},
-                         timeout=60)
+    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경변수 사용
+    resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=1024,
+                                  messages=[{"role": "user", "content": prompt}])
     # 호출 실패 시 규칙 기반 코멘트로 대체
-    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return "".join(b.text for b in resp.content if b.type == "text")
 ```
 
 ### 4-B. 주가 차트 이미지 생성 (`matplotlib`)
@@ -397,7 +399,7 @@ async def run_weekly_retrain():
 2. services/data_collector.py    ← FinanceDataReader OHLCV 수집
 3. services/krx_collector.py     ← 외국인/기관 수집
 4. services/news_crawler.py      ← 네이버 모바일 뉴스 API (제목+링크)
-5. services/sentiment_analyzer.py ← Gemini 감성 분석 + 코멘트
+5. services/sentiment_analyzer.py ← Claude 감성 분석 + 코멘트
 6. services/feature_engine.py    ← 피처 계산
 7. services/model_trainer.py     ← RF + XGB 학습
 8. train.py                      ← 학습 실행 스크립트
