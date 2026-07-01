@@ -79,7 +79,9 @@ stocksense/
 │   ├── dashboard.py                # GET / (대시보드 HTML)
 │   ├── predict_api.py              # GET /api/predict/{ticker}
 │   ├── report_api.py               # GET /api/report/{ticker}
-│   └── history_api.py              # GET /api/history/{ticker}
+│   ├── history_api.py              # GET /api/history/{ticker}
+│   ├── chart_api.py                # GET /api/chart/{ticker} (OHLC·MA·볼린저·RSI·MACD)
+│   └── logs_api.py                 # GET /api/logs (실행 로그)
 │
 ├── services/
 │   ├── data_collector.py           # FinanceDataReader 데이터 수집
