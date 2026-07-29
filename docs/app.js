@@ -29,6 +29,34 @@ let sectorMap = null;
 let paused = false;
 let remain = Number(intervalSel.value);
 
+/* ---------- 정규장/시간외(프리·애프터마켓) 보기 전환 ---------- */
+let viewMode = "regular";   // 'regular' | 'over'
+let modeAutoSet = false;    // 최초 데이터 기준 자동 선택은 한 번만
+const modeSeg = document.getElementById("modeSeg");
+
+function rateOf(s) {
+  if (viewMode === "over") return (s.ov && s.ov.price > 0) ? s.ov.rate : 0;
+  return s.rate;
+}
+
+function sessionLabel(session) {
+  if (session === "PRE_MARKET") return "프리마켓";
+  if (session === "AFTER_MARKET") return "애프터마켓";
+  return "시간외";
+}
+
+function setMode(mode) {
+  viewMode = mode;
+  for (const b of modeSeg.querySelectorAll("button")) {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  }
+  render();
+}
+modeSeg.addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (btn) { modeAutoSet = true; setMode(btn.dataset.mode); }
+});
+
 /* ---------- 색상 ---------- */
 const COLOR_STOPS = [
   [-3, [63, 100, 224]],
@@ -125,14 +153,24 @@ function parseStocks(rows, secs) {
     const code = s.itemCode || "";
     if (s.stockEndType !== "stock") continue;             // ETF/ETN 제외
     if (!code || code[code.length - 1] !== "0") continue; // 우선주 제외
+    const price = num(s.closePrice);
+    const o = s.overMarketPriceInfo || {};
+    const ovPrice = num(o.overPrice);
     stocks.push({
       code,
       name: s.stockName || "",
-      price: num(s.closePrice),
+      price,
       change: num(s.compareToPreviousClosePrice),
       rate: num(s.fluctuationsRatio),
       cap: num(s.marketValue),
       sector: secs[code] || "기타",
+      ov: {
+        price: ovPrice,
+        // 시간외 등락률: 직전 정규장 종가 대비
+        rate: (ovPrice > 0 && price > 0) ? +(((ovPrice - price) / price) * 100).toFixed(2) : 0,
+        session: o.tradingSessionType || "",
+        status: o.overMarketStatus || "",
+      },
     });
     if (stocks.length >= TOP_N) break;
   }
@@ -195,6 +233,15 @@ function fmtRate(rate) {
 
 function apply(data) {
   lastData = data;
+  // 시간외 세션 이름(프리마켓/애프터마켓)을 버튼에 반영
+  const withOv = data.stocks.find(s => s.ov && s.ov.session);
+  const overBtn = modeSeg.querySelector('button[data-mode="over"]');
+  if (withOv) overBtn.textContent = sessionLabel(withOv.ov.session);
+  // 첫 로드 시 시간외 거래가 진행 중이면 자동으로 시간외 보기
+  if (!modeAutoSet) {
+    modeAutoSet = true;
+    if (data.stocks.some(s => s.ov && s.ov.status === "OPEN")) setMode("over");
+  }
   updatedEl.textContent = "업데이트 " + data.updated;
   liveBadge.className = "badge " + (data.live ? "live" : "delay");
   liveBadge.textContent = data.live ? "실시간" : "지연";
@@ -247,13 +294,14 @@ function render() {
     g.stocks.forEach((s, si) => {
       const t = tileRects[si];
       if (t.w < 1 || t.h < 1) return;
+      const dispRate = rateOf(s);
       const tile = document.createElement("div");
       tile.className = "tile";
       tile.style.cssText =
         `left:${t.x + 1}px;top:${t.y + headH + 1}px;width:${t.w}px;height:${t.h}px;` +
-        `background:${colorFor(s.rate)};`;
+        `background:${colorFor(dispRate)};`;
 
-      addTileText(tile, s, t.w, t.h);
+      addTileText(tile, s.name, dispRate, t.w, t.h);
 
       tile.addEventListener("mousemove", ev => showTooltip(ev, s, g.name));
       tile.addEventListener("mouseleave", hideTooltip);
@@ -266,8 +314,7 @@ function render() {
 }
 
 /* 타일 안에 종목명(+등락률)을 최대한 크게 배치. 긴 이름은 2줄로 줄바꿈 */
-function addTileText(tile, s, w, h) {
-  const name = s.name;
+function addTileText(tile, name, rate, w, h) {
   // 글자 폭 추정: 한글 ≈ 1.0em, 영문/숫자/기호 ≈ 0.6em
   let effLen = 0;
   for (const ch of name) effLen += (ch >= "가" && ch <= "힣") ? 1 : 0.6;
@@ -305,19 +352,28 @@ function addTileText(tile, s, w, h) {
   if (rf >= 6) {
     const rt = document.createElement("div");
     rt.className = "rt";
-    rt.textContent = fmtRate(s.rate);
+    rt.textContent = fmtRate(rate);
     rt.style.fontSize = rf + "px";
     tile.appendChild(rt);
   }
 }
 
 /* ---------- 툴팁(데스크톱) ---------- */
+function ovLine(s, sep) {
+  if (!s.ov || !(s.ov.price > 0)) return "";
+  const c = s.ov.rate >= 0 ? "#f0736e" : "#7ba3f2";
+  return `${sessionLabel(s.ov.session)} ${s.ov.price.toLocaleString()}원 ` +
+    `<span style="color:${c}">${fmtRate(s.ov.rate)}</span>` +
+    `<span style="color:#8d968f"> (종가 대비)</span>${sep}`;
+}
+
 function showTooltip(ev, s, sectorName) {
   if (ev.pointerType === "touch") return;
   tooltipEl.innerHTML =
     `<b>${s.name}</b> <span style="color:#8d968f">${s.code} · ${sectorName}</span><br>` +
-    `현재가 ${s.price.toLocaleString()}원 ` +
+    `정규장 ${s.price.toLocaleString()}원 ` +
     `<span style="color:${s.rate >= 0 ? "#f0736e" : "#7ba3f2"}">${fmtRate(s.rate)}</span><br>` +
+    ovLine(s, "<br>") +
     `시가총액 ${fmtCap(s.cap)}`;
   tooltipEl.style.display = "block";
   const pad = 14;
@@ -336,9 +392,18 @@ function openSheet(s, sectorName) {
   document.getElementById("shName").textContent = s.name;
   document.getElementById("shMeta").textContent = `${s.code} · ${sectorName}`;
   const cls = s.rate >= 0 ? "up" : "down";
+  let ovHtml = "";
+  if (s.ov && s.ov.price > 0) {
+    const ovCls = s.ov.rate >= 0 ? "up" : "down";
+    ovHtml =
+      `${sessionLabel(s.ov.session)} <b>${s.ov.price.toLocaleString()}원</b> ` +
+      `<span class="${ovCls}">${fmtRate(s.ov.rate)}</span>` +
+      `<span style="color:#8d968f;font-size:12px"> 종가 대비${s.ov.status === "OPEN" ? " · 거래중" : ""}</span><br>`;
+  }
   document.getElementById("shBody").innerHTML =
-    `현재가 <b>${s.price.toLocaleString()}원</b> ` +
+    `정규장 <b>${s.price.toLocaleString()}원</b> ` +
     `<span class="${cls}">${fmtRate(s.rate)} (${s.change > 0 ? "+" : ""}${s.change.toLocaleString()})</span><br>` +
+    ovHtml +
     `시가총액 ${fmtCap(s.cap)}`;
   document.getElementById("shLink").href =
     `https://m.stock.naver.com/domestic/stock/${s.code}/total`;

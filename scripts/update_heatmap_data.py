@@ -82,14 +82,25 @@ def fetch_stocks(sector_map):
             continue
         if not code or code[-1] != "0":
             continue
+        price = num(s.get("closePrice"))
+        o = s.get("overMarketPriceInfo") or {}
+        ov_price = num(o.get("overPrice"))
+        # 시간외(NXT 프리/애프터마켓) 등락률: 직전 정규장 종가 대비
+        ov_rate = round((ov_price - price) / price * 100, 2) if ov_price > 0 and price > 0 else 0.0
         stocks.append({
             "code": code,
             "name": s.get("stockName", ""),
-            "price": num(s.get("closePrice")),
+            "price": price,
             "change": num(s.get("compareToPreviousClosePrice")),
             "rate": num(s.get("fluctuationsRatio")),
             "cap": num(s.get("marketValue")),
             "sector": sector_map.get(code, "기타"),
+            "ov": {
+                "price": ov_price,
+                "rate": ov_rate,
+                "session": o.get("tradingSessionType") or "",
+                "status": o.get("overMarketStatus") or "",
+            },
         })
         if len(stocks) >= TOP_N:
             break

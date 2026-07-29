@@ -13,6 +13,34 @@ let lastData = null;
 let paused = false;
 let remain = Number(intervalSel.value);
 
+/* ---------- 정규장/시간외(프리·애프터마켓) 보기 전환 ---------- */
+let viewMode = "regular";   // 'regular' | 'over'
+let modeAutoSet = false;    // 최초 데이터 기준 자동 선택은 한 번만
+const modeSeg = document.getElementById("modeSeg");
+
+function rateOf(s) {
+  if (viewMode === "over") return (s.ov && s.ov.price > 0) ? s.ov.rate : 0;
+  return s.rate;
+}
+
+function sessionLabel(session) {
+  if (session === "PRE_MARKET") return "프리마켓";
+  if (session === "AFTER_MARKET") return "애프터마켓";
+  return "시간외";
+}
+
+function setMode(mode) {
+  viewMode = mode;
+  for (const b of modeSeg.querySelectorAll("button")) {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  }
+  render();
+}
+modeSeg.addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (btn) { modeAutoSet = true; setMode(btn.dataset.mode); }
+});
+
 /* ---------- 색상: 등락률 → KOSPD 스타일 파랑(하락)~빨강(상승) ---------- */
 const COLOR_STOPS = [
   [-3, [63, 100, 224]],
@@ -126,13 +154,14 @@ function render() {
     g.stocks.forEach((s, si) => {
       const t = tileRects[si];
       if (t.w < 1 || t.h < 1) return;
+      const dispRate = rateOf(s);
       const tile = document.createElement("div");
       tile.className = "tile";
       tile.style.cssText =
         `left:${t.x + 1}px;top:${t.y + headH + 1}px;width:${t.w}px;height:${t.h}px;` +
-        `background:${colorFor(s.rate)};`;
+        `background:${colorFor(dispRate)};`;
 
-      addTileText(tile, s, t.w, t.h);
+      addTileText(tile, s.name, dispRate, t.w, t.h);
 
       tile.addEventListener("mousemove", ev => showTooltip(ev, s, g.name));
       tile.addEventListener("mouseleave", hideTooltip);
@@ -146,8 +175,7 @@ function render() {
 }
 
 /* 타일 안에 종목명(+등락률)을 최대한 크게 배치. 긴 이름은 2줄로 줄바꿈 */
-function addTileText(tile, s, w, h) {
-  const name = s.name;
+function addTileText(tile, name, rate, w, h) {
   // 글자 폭 추정: 한글 ≈ 1.0em, 영문/숫자/기호 ≈ 0.6em
   let effLen = 0;
   for (const ch of name) effLen += (ch >= "가" && ch <= "힣") ? 1 : 0.6;
@@ -185,17 +213,26 @@ function addTileText(tile, s, w, h) {
   if (rf >= 6) {
     const rt = document.createElement("div");
     rt.className = "rt";
-    rt.textContent = fmtRate(s.rate);
+    rt.textContent = fmtRate(rate);
     rt.style.fontSize = rf + "px";
     tile.appendChild(rt);
   }
 }
 
+function ovLine(s) {
+  if (!s.ov || !(s.ov.price > 0)) return "";
+  const c = s.ov.rate >= 0 ? "#f0736e" : "#7ba3f2";
+  return `${sessionLabel(s.ov.session)} ${s.ov.price.toLocaleString()}원 ` +
+    `<span style="color:${c}">${fmtRate(s.ov.rate)}</span>` +
+    `<span style="color:#8d968f"> (종가 대비${s.ov.status === "OPEN" ? " · 거래중" : ""})</span><br>`;
+}
+
 function showTooltip(ev, s, sectorName) {
   tooltipEl.innerHTML =
     `<b>${s.name}</b> <span style="color:#8d968f">${s.code} · ${sectorName}</span><br>` +
-    `현재가 ${s.price.toLocaleString()}원 ` +
+    `정규장 ${s.price.toLocaleString()}원 ` +
     `<span style="color:${s.rate >= 0 ? "#f0736e" : "#7ba3f2"}">${fmtRate(s.rate)} (${s.change > 0 ? "+" : ""}${s.change.toLocaleString()})</span><br>` +
+    ovLine(s) +
     `시가총액 ${fmtCap(s.cap)}`;
   tooltipEl.style.display = "block";
   const pad = 14;
@@ -228,6 +265,15 @@ async function refresh() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     lastData = data;
+    // 시간외 세션 이름(프리마켓/애프터마켓)을 버튼에 반영
+    const withOv = data.stocks.find(s => s.ov && s.ov.session);
+    const overBtn = modeSeg.querySelector('button[data-mode="over"]');
+    if (withOv) overBtn.textContent = sessionLabel(withOv.ov.session);
+    // 첫 로드 시 시간외 거래가 진행 중이면 자동으로 시간외 보기
+    if (!modeAutoSet) {
+      modeAutoSet = true;
+      if (data.stocks.some(s => s.ov && s.ov.status === "OPEN")) setMode("over");
+    }
     updatedEl.textContent = "업데이트 " + data.updated.slice(11);
     if (data.kospi && data.kospi.value) {
       const k = data.kospi;

@@ -120,13 +120,24 @@ def fetch_top_stocks():
             continue
         if not code or code[-1] != "0":   # 표준코드 끝자리 0이 아니면 우선주/특수주
             continue
+        price = _num(s.get("closePrice"))
+        o = s.get("overMarketPriceInfo") or {}
+        ov_price = _num(o.get("overPrice"))
+        # 시간외(NXT 프리/애프터마켓) 등락률: 직전 정규장 종가 대비
+        ov_rate = round((ov_price - price) / price * 100, 2) if ov_price > 0 and price > 0 else 0.0
         stocks.append({
             "code": code,
             "name": s.get("stockName", ""),
-            "price": _num(s.get("closePrice")),
+            "price": price,
             "change": _num(s.get("compareToPreviousClosePrice")),
             "rate": _num(s.get("fluctuationsRatio")),
             "cap": _num(s.get("marketValue")),  # 단위: 억원
+            "ov": {
+                "price": ov_price,
+                "rate": ov_rate,
+                "session": o.get("tradingSessionType") or "",
+                "status": o.get("overMarketStatus") or "",
+            },
         })
         if len(stocks) >= TOP_N:
             break

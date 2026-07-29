@@ -26,14 +26,22 @@ header {
 }
 .brand span { color: #7ee08a; }
 
-.period {
-  font-size: 14px;
-  font-weight: 700;
-  color: #9aa39c;
-  padding: 3px 8px;
-  border-radius: 4px;
+#modeSeg {
+  display: flex;
+  border: 1px solid #2a382e;
+  border-radius: 5px;
+  overflow: hidden;
 }
-.period.active { color: #ffd94a; }
+#modeSeg button {
+  background: #0f1811;
+  color: #8d968f;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+#modeSeg button.active { background: #1d3a25; color: #8fe89b; }
 
 .kospi-chip { font-size: 13px; color: #cdd6cf; }
 .kospi-chip b { font-size: 14px; }

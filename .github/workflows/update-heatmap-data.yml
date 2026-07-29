@@ -2,8 +2,10 @@ name: Update heatmap data
 
 on:
   schedule:
-    # KST 09:00~15:50 (UTC 00:00~06:50) 평일 10분 간격
-    - cron: "*/10 0-6 * * 1-5"
+    # KST 08:00~08:50 프리마켓 (UTC 전날 23시, 일~목) 10분 간격
+    - cron: "*/10 23 * * 0-4"
+    # KST 09:00~19:50 정규장+애프터마켓 (UTC 00:00~10:50) 평일 10분 간격
+    - cron: "*/10 0-10 * * 1-5"
   workflow_dispatch:
 
 concurrency:
