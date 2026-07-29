@@ -85,8 +85,6 @@ def fetch_stocks(sector_map):
         price = num(s.get("closePrice"))
         o = s.get("overMarketPriceInfo") or {}
         ov_price = num(o.get("overPrice"))
-        # 시간외(NXT 프리/애프터마켓) 등락률: 직전 정규장 종가 대비
-        ov_rate = round((ov_price - price) / price * 100, 2) if ov_price > 0 and price > 0 else 0.0
         stocks.append({
             "code": code,
             "name": s.get("stockName", ""),
@@ -97,7 +95,9 @@ def fetch_stocks(sector_map):
             "sector": sector_map.get(code, "기타"),
             "ov": {
                 "price": ov_price,
-                "rate": ov_rate,
+                # 네이버 표기와 동일: 전일 종가 대비 등락률
+                "rate": num(o.get("fluctuationsRatio")),
+                "change": num(o.get("compareToPreviousClosePrice")),
                 "session": o.get("tradingSessionType") or "",
                 "status": o.get("overMarketStatus") or "",
             },

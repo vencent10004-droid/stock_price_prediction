@@ -219,12 +219,19 @@ function addTileText(tile, name, rate, w, h) {
   }
 }
 
+/* 시간외 가격의 당일 종가 대비 변동률 (순수 시간외 변동분) */
+function ovVsClose(s) {
+  if (!s.ov || !(s.ov.price > 0) || !(s.price > 0)) return null;
+  return ((s.ov.price - s.price) / s.price) * 100;
+}
+
 function ovLine(s) {
   if (!s.ov || !(s.ov.price > 0)) return "";
   const c = s.ov.rate >= 0 ? "#f0736e" : "#7ba3f2";
   return `${sessionLabel(s.ov.session)} ${s.ov.price.toLocaleString()}원 ` +
     `<span style="color:${c}">${fmtRate(s.ov.rate)}</span>` +
-    `<span style="color:#8d968f"> (종가 대비${s.ov.status === "OPEN" ? " · 거래중" : ""})</span><br>`;
+    `<span style="color:#8d968f"> 전일 대비 · 종가 대비 ${fmtRate(ovVsClose(s))}` +
+    `${s.ov.status === "OPEN" ? " · 거래중" : ""}</span><br>`;
 }
 
 function showTooltip(ev, s, sectorName) {

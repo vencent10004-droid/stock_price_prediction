@@ -6,13 +6,42 @@
 
 const TOP_N = 100;
 
-/* 실시간 시세용 CORS 프록시 후보 (순서대로 시도, 성공한 프록시 기억) */
+/* 전용 프록시(Cloudflare Workers 등)를 배포했다면 여기에 URL을 넣으세요.
+ * 예: "https://내이름.workers.dev/?url="  (repo의 proxy/cloudflare-worker.js 참고)
+ * 설정하면 공개 프록시보다 항상 우선 사용되어 실시간이 안정적으로 동작합니다. */
+const MY_PROXY = "";
+
+/* 공개 CORS 프록시 후보 — 매 갱신마다 전부 동시에 시도(race)해서 가장 먼저
+ * 성공한 응답을 사용하고, 그 프록시를 localStorage에 기억해 다음에도 우선한다. */
 const PROXIES = [
   u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,
 ];
-let proxyIdx = 0;
+if (MY_PROXY) PROXIES.unshift(u => MY_PROXY + encodeURIComponent(u));
+
+const promiseAny = ps => Promise.any
+  ? Promise.any(ps)
+  : new Promise((res, rej) => {
+      let n = ps.length;
+      ps.forEach(p => p.then(res, () => { if (--n === 0) rej(new Error("all failed")); }));
+    });
+
+function fetchViaProxies(url, validate) {
+  let order = PROXIES.map((_, i) => i);
+  const good = Number(localStorage.getItem("goodProxy"));
+  if (!isNaN(good) && good >= 0 && good < PROXIES.length) {
+    order = [good, ...order.filter(i => i !== good)];
+  }
+  return promiseAny(order.map(i =>
+    fetchJson(PROXIES[i](url), 7000).then(d => {
+      if (validate && !validate(d)) throw new Error("bad payload");
+      try { localStorage.setItem("goodProxy", i); } catch (e) { /* 사파리 프라이빗 등 */ }
+      return d;
+    })
+  ));
+}
 
 const mapEl = document.getElementById("map");
 const tooltipEl = document.getElementById("tooltip");
@@ -166,8 +195,9 @@ function parseStocks(rows, secs) {
       sector: secs[code] || "기타",
       ov: {
         price: ovPrice,
-        // 시간외 등락률: 직전 정규장 종가 대비
-        rate: (ovPrice > 0 && price > 0) ? +(((ovPrice - price) / price) * 100).toFixed(2) : 0,
+        // 네이버 표기와 동일: 전일 종가 대비 등락률
+        rate: num(o.fluctuationsRatio),
+        change: num(o.compareToPreviousClosePrice),
         session: o.tradingSessionType || "",
         status: o.overMarketStatus || "",
       },
@@ -179,36 +209,30 @@ function parseStocks(rows, secs) {
 
 async function loadRealtime() {
   const secs = await getSectorMap();
-  let lastErr = null;
-  for (let n = 0; n < PROXIES.length; n++) {
-    const idx = (proxyIdx + n) % PROXIES.length;
-    const proxy = PROXIES[idx];
-    const ts = Date.now();
-    try {
-      const pages = await Promise.all([1, 2].map(p =>
-        fetchJson(proxy(`https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=${p}&pageSize=100&_=${ts}`))
-      ));
-      const stocks = parseStocks(pages.flatMap(d => d.stocks || []), secs);
-      if (stocks.length < 50) throw new Error("종목 수 부족");
+  const ts = Date.now();
+  const okList = d => d && d.stocks && d.stocks.length > 0;
+  const pages = await Promise.all([1, 2].map(p =>
+    fetchViaProxies(
+      `https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=${p}&pageSize=100&_=${ts}`,
+      okList)
+  ));
+  const stocks = parseStocks(pages.flatMap(d => d.stocks || []), secs);
+  if (stocks.length < 50) throw new Error("종목 수 부족");
 
-      let kospi = null;
-      try {
-        const k = await fetchJson(proxy(`https://m.stock.naver.com/api/index/KOSPI/basic?_=${ts}`));
-        kospi = { value: num(k.closePrice), rate: num(k.fluctuationsRatio) };
-      } catch (e) { /* 지수는 없어도 무방 */ }
+  let kospi = null;
+  try {
+    const k = await fetchViaProxies(
+      `https://m.stock.naver.com/api/index/KOSPI/basic?_=${ts}`,
+      d => d && d.closePrice);
+    kospi = { value: num(k.closePrice), rate: num(k.fluctuationsRatio) };
+  } catch (e) { /* 지수는 없어도 무방 */ }
 
-      proxyIdx = idx;  // 성공한 프록시를 다음에도 우선 사용
-      return {
-        updated: new Date().toTimeString().slice(0, 8),
-        kospi,
-        stocks,
-        live: true,
-      };
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error("proxy fail");
+  return {
+    updated: new Date().toTimeString().slice(0, 8),
+    kospi,
+    stocks,
+    live: true,
+  };
 }
 
 async function loadSnapshot() {
@@ -359,12 +383,19 @@ function addTileText(tile, name, rate, w, h) {
 }
 
 /* ---------- 툴팁(데스크톱) ---------- */
+/* 시간외 가격의 당일 종가 대비 변동률 (순수 시간외 변동분) */
+function ovVsClose(s) {
+  if (!s.ov || !(s.ov.price > 0) || !(s.price > 0)) return null;
+  return ((s.ov.price - s.price) / s.price) * 100;
+}
+
 function ovLine(s, sep) {
   if (!s.ov || !(s.ov.price > 0)) return "";
   const c = s.ov.rate >= 0 ? "#f0736e" : "#7ba3f2";
+  const vs = ovVsClose(s);
   return `${sessionLabel(s.ov.session)} ${s.ov.price.toLocaleString()}원 ` +
     `<span style="color:${c}">${fmtRate(s.ov.rate)}</span>` +
-    `<span style="color:#8d968f"> (종가 대비)</span>${sep}`;
+    `<span style="color:#8d968f"> 전일 대비 · 종가 대비 ${fmtRate(vs)}</span>${sep}`;
 }
 
 function showTooltip(ev, s, sectorName) {
@@ -395,10 +426,12 @@ function openSheet(s, sectorName) {
   let ovHtml = "";
   if (s.ov && s.ov.price > 0) {
     const ovCls = s.ov.rate >= 0 ? "up" : "down";
+    const chg = s.ov.change || 0;
     ovHtml =
       `${sessionLabel(s.ov.session)} <b>${s.ov.price.toLocaleString()}원</b> ` +
-      `<span class="${ovCls}">${fmtRate(s.ov.rate)}</span>` +
-      `<span style="color:#8d968f;font-size:12px"> 종가 대비${s.ov.status === "OPEN" ? " · 거래중" : ""}</span><br>`;
+      `<span class="${ovCls}">${fmtRate(s.ov.rate)} (${chg > 0 ? "+" : ""}${chg.toLocaleString()})</span><br>` +
+      `<span style="color:#8d968f;font-size:12px">당일 종가 대비 ${fmtRate(ovVsClose(s))}` +
+      `${s.ov.status === "OPEN" ? " · 거래중" : ""}</span><br>`;
   }
   document.getElementById("shBody").innerHTML =
     `정규장 <b>${s.price.toLocaleString()}원</b> ` +

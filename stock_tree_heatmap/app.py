@@ -123,8 +123,6 @@ def fetch_top_stocks():
         price = _num(s.get("closePrice"))
         o = s.get("overMarketPriceInfo") or {}
         ov_price = _num(o.get("overPrice"))
-        # 시간외(NXT 프리/애프터마켓) 등락률: 직전 정규장 종가 대비
-        ov_rate = round((ov_price - price) / price * 100, 2) if ov_price > 0 and price > 0 else 0.0
         stocks.append({
             "code": code,
             "name": s.get("stockName", ""),
@@ -134,7 +132,9 @@ def fetch_top_stocks():
             "cap": _num(s.get("marketValue")),  # 단위: 억원
             "ov": {
                 "price": ov_price,
-                "rate": ov_rate,
+                # 네이버 표기와 동일: 전일 종가 대비 등락률
+                "rate": _num(o.get("fluctuationsRatio")),
+                "change": _num(o.get("compareToPreviousClosePrice")),
                 "session": o.get("tradingSessionType") or "",
                 "status": o.get("overMarketStatus") or "",
             },
