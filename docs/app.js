@@ -1,11 +1,18 @@
 /* KOSPI 100 실시간 트리맵 히트맵 — GitHub Pages 정적 버전
- * 실시간: allorigins CORS 프록시 → 네이버 증권 API
- * 폴백: GitHub Actions가 장중 주기 갱신하는 data.json
+ * 1) 같은 저장소의 data.json(GitHub Actions가 장중 10분마다 갱신)을 먼저 즉시 표시
+ * 2) CORS 프록시 → 네이버 증권 API 실시간 데이터가 받아지면 그걸로 업그레이드
  */
 "use strict";
 
 const TOP_N = 100;
-const PROXY = u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`;
+
+/* 실시간 시세용 CORS 프록시 후보 (순서대로 시도, 성공한 프록시 기억) */
+const PROXIES = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+let proxyIdx = 0;
 
 const mapEl = document.getElementById("map");
 const tooltipEl = document.getElementById("tooltip");
@@ -90,7 +97,7 @@ function num(text, def = 0) {
   return isNaN(v) ? def : v;
 }
 
-async function fetchJson(url, timeoutMs = 12000) {
+async function fetchJson(url, timeoutMs = 8000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -112,17 +119,11 @@ async function getSectorMap() {
   return sectorMap;
 }
 
-async function loadRealtime() {
-  const secs = await getSectorMap();
-  const ts = Date.now();
-  const pages = await Promise.all([1, 2].map(p =>
-    fetchJson(PROXY(`https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=${p}&pageSize=100&_=${ts}`))
-  ));
-  const rows = pages.flatMap(d => d.stocks || []);
+function parseStocks(rows, secs) {
   const stocks = [];
   for (const s of rows) {
     const code = s.itemCode || "";
-    if (s.stockEndType !== "stock") continue;          // ETF/ETN 제외
+    if (s.stockEndType !== "stock") continue;             // ETF/ETN 제외
     if (!code || code[code.length - 1] !== "0") continue; // 우선주 제외
     stocks.push({
       code,
@@ -135,29 +136,50 @@ async function loadRealtime() {
     });
     if (stocks.length >= TOP_N) break;
   }
-  if (stocks.length < 50) throw new Error("종목 수 부족");
+  return stocks;
+}
 
-  let kospi = null;
-  try {
-    const k = await fetchJson(PROXY(`https://m.stock.naver.com/api/index/KOSPI/basic?_=${ts}`));
-    kospi = { value: num(k.closePrice), rate: num(k.fluctuationsRatio) };
-  } catch (e) { /* 지수는 없어도 무방 */ }
+async function loadRealtime() {
+  const secs = await getSectorMap();
+  let lastErr = null;
+  for (let n = 0; n < PROXIES.length; n++) {
+    const idx = (proxyIdx + n) % PROXIES.length;
+    const proxy = PROXIES[idx];
+    const ts = Date.now();
+    try {
+      const pages = await Promise.all([1, 2].map(p =>
+        fetchJson(proxy(`https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=${p}&pageSize=100&_=${ts}`))
+      ));
+      const stocks = parseStocks(pages.flatMap(d => d.stocks || []), secs);
+      if (stocks.length < 50) throw new Error("종목 수 부족");
 
-  const now = new Date();
-  return {
-    updated: now.toTimeString().slice(0, 8),
-    kospi,
-    stocks,
-    live: true,
-  };
+      let kospi = null;
+      try {
+        const k = await fetchJson(proxy(`https://m.stock.naver.com/api/index/KOSPI/basic?_=${ts}`));
+        kospi = { value: num(k.closePrice), rate: num(k.fluctuationsRatio) };
+      } catch (e) { /* 지수는 없어도 무방 */ }
+
+      proxyIdx = idx;  // 성공한 프록시를 다음에도 우선 사용
+      return {
+        updated: new Date().toTimeString().slice(0, 8),
+        kospi,
+        stocks,
+        live: true,
+      };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("proxy fail");
 }
 
 async function loadSnapshot() {
   const d = await fetchJson(`data.json?_=${Date.now()}`);
+  if (!d.stocks || d.stocks.length === 0) throw new Error("빈 데이터");
   return {
     updated: (d.updated || "").slice(11) || "-",
     kospi: d.kospi,
-    stocks: d.stocks || [],
+    stocks: d.stocks,
     live: false,
   };
 }
@@ -169,6 +191,19 @@ function fmtCap(capEok) {
 }
 function fmtRate(rate) {
   return (rate > 0 ? "+" : "") + rate.toFixed(2) + "%";
+}
+
+function apply(data) {
+  lastData = data;
+  updatedEl.textContent = "업데이트 " + data.updated;
+  liveBadge.className = "badge " + (data.live ? "live" : "delay");
+  liveBadge.textContent = data.live ? "실시간" : "지연";
+  if (data.kospi && data.kospi.value) {
+    const cls = data.kospi.rate >= 0 ? "up" : "down";
+    kospiEl.innerHTML =
+      `KOSPI <b>${data.kospi.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(data.kospi.rate)}</span>`;
+  }
+  render();
 }
 
 function render() {
@@ -297,31 +332,27 @@ mapEl.addEventListener("click", ev => {
 })();
 
 /* ---------- 갱신 루프 ---------- */
+function showError() {
+  mapEl.innerHTML =
+    `<div id="overlay-msg">데이터를 불러오지 못했습니다.<br>잠시 후 자동으로 다시 시도합니다.</div>`;
+  updatedEl.textContent = "갱신 실패";
+}
+
 async function refresh() {
-  let data = null;
+  // 실시간 데이터가 아직 없으면 같은 저장소의 스냅숏을 병행 로드해서 먼저 그림
+  let snapPromise = null;
+  if (!lastData || !lastData.live) {
+    snapPromise = loadSnapshot()
+      .then(d => { if (!lastData || !lastData.live) apply(d); })
+      .catch(() => {});
+  }
   try {
-    data = await loadRealtime();
+    apply(await loadRealtime());   // 실시간이 받아지면 스냅숏을 덮어씀
   } catch (e) {
-    try {
-      data = await loadSnapshot();
-    } catch (e2) {
-      if (!lastData) {
-        mapEl.innerHTML = `<div id="overlay-msg">데이터를 불러오지 못했습니다.<br>잠시 후 자동으로 다시 시도합니다.</div>`;
-      }
-      updatedEl.textContent = "갱신 실패";
-      return;
-    }
+    if (snapPromise) await snapPromise;
+    if (!lastData) showError();
+    else if (lastData.live) updatedEl.textContent = "갱신 실패 (이전 데이터 표시)";
   }
-  lastData = data;
-  updatedEl.textContent = "업데이트 " + data.updated;
-  liveBadge.className = "badge " + (data.live ? "live" : "delay");
-  liveBadge.textContent = data.live ? "실시간" : "지연";
-  if (data.kospi && data.kospi.value) {
-    const cls = data.kospi.rate >= 0 ? "up" : "down";
-    kospiEl.innerHTML =
-      `KOSPI <b>${data.kospi.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(data.kospi.rate)}</span>`;
-  }
-  render();
 }
 
 function tick() {
