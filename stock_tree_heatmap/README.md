@@ -8,7 +8,19 @@ KOSPD.com 스타일의 트리맵 히트맵으로 보여주는 프로그램입니
 - **자동 갱신** = 기본 20초 (10/30/60초 선택, 일시정지 가능)
 - 타일에 마우스를 올리면 현재가·등락률·시가총액 표시, 클릭하면 네이버 증권 페이지 열림
 
-## 실행 방법
+## 📱 웹 버전 (휴대폰에서 사용)
+
+PC 없이 휴대폰 브라우저에서 바로 쓸 수 있는 웹페이지 버전이 있습니다:
+
+**https://vencent10004-droid.github.io/stock_price_prediction/**
+
+- 소스: 저장소의 `docs/` 폴더 (GitHub Pages로 호스팅)
+- 실시간 시세: allorigins CORS 프록시 → 네이버 증권 API
+- 프록시 장애 시: GitHub Actions(`.github/workflows/update-heatmap-data.yml`)가
+  장중 10분마다 갱신하는 `docs/data.json`으로 자동 폴백 (화면에 `지연` 배지 표시)
+- 종목을 탭하면 상세 정보 시트가 열립니다
+
+## 실행 방법 (PC 로컬 버전)
 
 `run.bat` 을 더블클릭하면 패키지 설치 후 서버가 시작되고 브라우저가 자동으로 열립니다.
 
