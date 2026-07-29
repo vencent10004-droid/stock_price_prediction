@@ -243,6 +243,7 @@ async function loadSnapshot() {
   if (!d.stocks || d.stocks.length === 0) throw new Error("빈 데이터");
   return {
     updated: (d.updated || "").slice(11) || "-",
+    updatedFull: d.updated || "",
     kospi: d.kospi,
     stocks: d.stocks,
     live: false,
@@ -271,7 +272,14 @@ function apply(data) {
   }
   updatedEl.textContent = "업데이트 " + data.updated;
   liveBadge.className = "badge " + (data.live ? "live" : "delay");
-  liveBadge.textContent = data.live ? "실시간" : "지연";
+  let delayLabel = "지연";
+  if (!data.live && data.updatedFull) {
+    // 스냅숏 데이터가 몇 분 지났는지 표시 (기기 시간 기준)
+    const t = new Date(data.updatedFull.replace(" ", "T")).getTime();
+    const ageMin = Math.round((Date.now() - t) / 60000);
+    if (ageMin >= 2) delayLabel = `지연 ${ageMin}분`;
+  }
+  liveBadge.textContent = data.live ? "실시간" : delayLabel;
   if (data.kospi && data.kospi.value) {
     const cls = data.kospi.rate >= 0 ? "up" : "down";
     kospiEl.innerHTML =
