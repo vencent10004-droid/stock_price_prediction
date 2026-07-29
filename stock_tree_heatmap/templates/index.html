@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOSPI 100 실시간 히트맵</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">KOSPI<span>100</span> MAP</div>
+    <div class="period active">1일</div>
+    <div class="kospi-chip" id="kospiChip"></div>
+    <div class="spacer"></div>
+    <div class="status">
+      <span id="updatedAt"></span>
+      <select id="intervalSel" title="자동 갱신 간격">
+        <option value="10">10초</option>
+        <option value="20" selected>20초</option>
+        <option value="30">30초</option>
+        <option value="60">60초</option>
+      </select>
+      <button id="pauseBtn" title="자동 갱신 일시정지">⏸</button>
+      <span id="countdown"></span>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <div id="legend"></div>
+  <div id="tooltip"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
