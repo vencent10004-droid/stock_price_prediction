@@ -132,24 +132,7 @@ function render() {
         `left:${t.x + 1}px;top:${t.y + headH + 1}px;width:${t.w}px;height:${t.h}px;` +
         `background:${colorFor(s.rate)};`;
 
-      // 글자 크기: 타일 크기에 맞춰 조절
-      const nameFit = (t.w * 1.55) / Math.max(2, s.name.length);
-      const f = Math.min(t.h * 0.3, nameFit, 40);
-      if (f >= 8) {
-        const nm = document.createElement("div");
-        nm.className = "nm";
-        nm.textContent = s.name;
-        nm.style.fontSize = f + "px";
-        tile.appendChild(nm);
-        const rf = Math.min(f * 0.72, t.h * 0.22);
-        if (rf >= 7.5) {
-          const rt = document.createElement("div");
-          rt.className = "rt";
-          rt.textContent = fmtRate(s.rate);
-          rt.style.fontSize = rf + "px";
-          tile.appendChild(rt);
-        }
-      }
+      addTileText(tile, s, t.w, t.h);
 
       tile.addEventListener("mousemove", ev => showTooltip(ev, s, g.name));
       tile.addEventListener("mouseleave", hideTooltip);
@@ -160,6 +143,52 @@ function render() {
 
     mapEl.appendChild(secDiv);
   });
+}
+
+/* 타일 안에 종목명(+등락률)을 최대한 크게 배치. 긴 이름은 2줄로 줄바꿈 */
+function addTileText(tile, s, w, h) {
+  const name = s.name;
+  // 글자 폭 추정: 한글 ≈ 1.0em, 영문/숫자/기호 ≈ 0.6em
+  let effLen = 0;
+  for (const ch of name) effLen += (ch >= "가" && ch <= "힣") ? 1 : 0.6;
+  effLen = Math.max(effLen, 1);
+
+  const innerW = w - 3;
+  // 1줄 배치와 2줄 배치 중 더 큰 글자가 가능한 쪽 선택
+  const f1 = Math.min(h * 0.42, innerW / effLen);
+  let f2 = 0, split = 0;
+  if (name.length >= 4) {
+    split = Math.ceil(name.length / 2);
+    let effFirst = 0;
+    for (const ch of name.slice(0, split)) effFirst += (ch >= "가" && ch <= "힣") ? 1 : 0.6;
+    const effLine = Math.max(effFirst, effLen - effFirst, 1);
+    f2 = Math.min(h * 0.27, innerW / effLine);
+  }
+  const twoLine = f2 > f1;
+  const f = Math.min(twoLine ? f2 : f1, 40);
+  if (f < 6.5) return;  // 이 크기 밑으로는 읽을 수 없으므로 색상만 표시
+
+  const nm = document.createElement("div");
+  nm.className = "nm";
+  if (twoLine) {
+    nm.append(name.slice(0, split), document.createElement("br"), name.slice(split));
+    nm.style.lineHeight = "1.05";
+  } else {
+    nm.textContent = name;
+  }
+  nm.style.fontSize = f + "px";
+  tile.appendChild(nm);
+
+  // 등락률: 이름을 배치하고 남는 높이에 들어갈 때만
+  const usedH = (twoLine ? 2.2 : 1.2) * f;
+  const rf = Math.min(f * 0.72, (h - usedH) * 0.8);
+  if (rf >= 6) {
+    const rt = document.createElement("div");
+    rt.className = "rt";
+    rt.textContent = fmtRate(s.rate);
+    rt.style.fontSize = rf + "px";
+    tile.appendChild(rt);
+  }
 }
 
 function showTooltip(ev, s, sectorName) {
