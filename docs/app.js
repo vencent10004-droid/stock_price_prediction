@@ -238,9 +238,22 @@ async function loadRealtime() {
   };
 }
 
+/* Actions가 장중 60초마다 갱신하는 data 브랜치 (raw는 CORS 허용이라 프록시 불필요) */
+const RAW_DATA_URL =
+  "https://raw.githubusercontent.com/vencent10004-droid/stock_price_prediction/data/docs/data.json";
+
 async function loadSnapshot() {
-  const d = await fetchJson(`data.json?_=${Date.now()}`);
-  if (!d.stocks || d.stocks.length === 0) throw new Error("빈 데이터");
+  const tryFetch = url =>
+    fetchJson(url, 6000).then(d => (d && d.stocks && d.stocks.length ? d : null)).catch(() => null);
+  // 분 단위 데이터(raw)와 5분 단위 데이터(Pages)를 동시에 받아 더 최신 쪽 사용
+  const [rawD, localD] = await Promise.all([
+    tryFetch(`${RAW_DATA_URL}?_=${Date.now()}`),
+    tryFetch(`data.json?_=${Date.now()}`),
+  ]);
+  let d;
+  if (rawD && localD) d = (rawD.updated || "") >= (localD.updated || "") ? rawD : localD;
+  else d = rawD || localD;
+  if (!d) throw new Error("빈 데이터");
   return {
     updated: (d.updated || "").slice(11) || "-",
     updatedFull: d.updated || "",
@@ -271,15 +284,24 @@ function apply(data) {
     if (data.stocks.some(s => s.ov && s.ov.status === "OPEN")) setMode("over");
   }
   updatedEl.textContent = "업데이트 " + data.updated;
-  liveBadge.className = "badge " + (data.live ? "live" : "delay");
-  let delayLabel = "지연";
-  if (!data.live && data.updatedFull) {
+  if (data.live) {
+    liveBadge.className = "badge live";
+    liveBadge.textContent = "실시간";
+  } else {
     // 스냅숏 데이터가 몇 분 지났는지 표시 (기기 시간 기준)
-    const t = new Date(data.updatedFull.replace(" ", "T")).getTime();
-    const ageMin = Math.round((Date.now() - t) / 60000);
-    if (ageMin >= 2) delayLabel = `지연 ${ageMin}분`;
+    let ageMin = 0;
+    if (data.updatedFull) {
+      const t = new Date(data.updatedFull.replace(" ", "T")).getTime();
+      ageMin = Math.round((Date.now() - t) / 60000);
+    }
+    if (ageMin <= 2) {
+      liveBadge.className = "badge semi";
+      liveBadge.textContent = "준실시간";
+    } else {
+      liveBadge.className = "badge delay";
+      liveBadge.textContent = `지연 ${ageMin}분`;
+    }
   }
-  liveBadge.textContent = data.live ? "실시간" : delayLabel;
   if (data.kospi && data.kospi.value) {
     const cls = data.kospi.rate >= 0 ? "up" : "down";
     kospiEl.innerHTML =

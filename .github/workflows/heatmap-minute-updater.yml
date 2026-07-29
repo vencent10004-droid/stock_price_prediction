@@ -1,0 +1,56 @@
+name: Heatmap minute updater
+
+# 장중(프리마켓~애프터마켓)에 약 60초 간격으로 시세를 data 브랜치에 커밋한다.
+# 페이지는 raw.githubusercontent.com(data 브랜치)에서 CORS 제약 없이 읽는다.
+on:
+  schedule:
+    # KST 08:00/08:30 (UTC 전날 23시, 일~목)
+    - cron: "0,30 23 * * 0-4"
+    # KST 09:00~19:30 매시 0분/30분 (UTC 00~10시)
+    - cron: "0,30 0-10 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: heatmap-minute
+  cancel-in-progress: false
+
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Minute update loop (~55 min)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B data
+          first=1
+          for i in $(seq 1 55); do
+            hhmm=$(TZ=Asia/Seoul date +%H%M)
+            if [ "$hhmm" -lt 0755 ] || [ "$hhmm" -gt 2005 ]; then
+              echo "outside market hours ($hhmm KST), stopping"
+              break
+            fi
+            python scripts/update_heatmap_data.py || true
+            git add docs/data.json docs/sectors.json
+            if ! git diff --cached --quiet; then
+              if [ "$first" = "1" ]; then
+                git commit -q -m "data snapshot"
+                first=0
+              else
+                git commit -q --amend -m "data snapshot"
+              fi
+              git push -qf origin data || true
+            fi
+            sleep 50
+          done

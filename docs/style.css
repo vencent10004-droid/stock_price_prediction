@@ -82,6 +82,7 @@ header {
   display: none;
 }
 .badge.live { display: inline; background: #143a1c; color: #7ee08a; }
+.badge.semi { display: inline; background: #2e3a14; color: #c9e06a; }
 .badge.delay { display: inline; background: #3a2f14; color: #e0c05a; }
 
 #map {
