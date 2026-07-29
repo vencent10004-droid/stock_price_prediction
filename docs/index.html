@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b120d">
 <title>KOSPI 100 실시간 히트맵</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header>
@@ -30,7 +30,11 @@
     </div>
   </header>
 
-  <div id="map"><div id="overlay-msg">시세 데이터를 불러오는 중…</div></div>
+  <div id="map">
+    <div id="canvas"></div>
+    <div id="overlay-msg">시세 데이터를 불러오는 중…</div>
+    <button id="zoomReset">100% ⟲</button>
+  </div>
 
   <div id="legend"></div>
   <div id="tooltip"></div>
@@ -47,6 +51,6 @@
     <a id="shLink" target="_blank" rel="noopener">네이버 증권에서 보기 →</a>
   </div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

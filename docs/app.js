@@ -44,6 +44,9 @@ function fetchViaProxies(url, validate) {
 }
 
 const mapEl = document.getElementById("map");
+const canvasEl = document.getElementById("canvas");
+const overlayEl = document.getElementById("overlay-msg");
+const zoomResetBtn = document.getElementById("zoomReset");
 const tooltipEl = document.getElementById("tooltip");
 const updatedEl = document.getElementById("updatedAt");
 const countdownEl = document.getElementById("countdown");
@@ -279,9 +282,18 @@ function apply(data) {
 
 function render() {
   if (!lastData) return;
-  mapEl.innerHTML = "";
-  const W = mapEl.clientWidth, H = mapEl.clientHeight;
-  if (W < 50 || H < 50) return;
+  overlayEl.style.display = "none";
+  canvasEl.innerHTML = "";
+  const baseW = mapEl.clientWidth, baseH = mapEl.clientHeight;
+  if (baseW < 50 || baseH < 50) return;
+  // 확대 배율만큼 큰 캔버스에 그리면 작은 타일도 커져서 글자가 나타난다
+  const W = baseW * zoom, H = baseH * zoom;
+  clampPan();
+  canvasEl.style.width = W + "px";
+  canvasEl.style.height = H + "px";
+  canvasEl.style.left = panX + "px";
+  canvasEl.style.top = panY + "px";
+  canvasEl.style.transform = "";
 
   const groups = new Map();
   for (const s of lastData.stocks) {
@@ -333,9 +345,138 @@ function render() {
       secDiv.appendChild(tile);
     });
 
-    mapEl.appendChild(secDiv);
+    canvasEl.appendChild(secDiv);
   });
 }
+
+/* ---------- 확대/축소(핀치 줌)·이동 ---------- */
+let zoom = 1, panX = 0, panY = 0;
+
+function clampPan() {
+  const W = mapEl.clientWidth, H = mapEl.clientHeight;
+  panX = Math.min(0, Math.max(W - W * zoom, panX));
+  panY = Math.min(0, Math.max(H - H * zoom, panY));
+}
+
+function updateZoomBtn() {
+  zoomResetBtn.style.display = zoom > 1.01 ? "block" : "none";
+  zoomResetBtn.textContent = Math.round(zoom * 100) + "% ⟲";
+}
+
+/* (cx, cy): #map 좌표 기준으로 화면에 고정할 점 */
+function setZoom(z, cx, cy) {
+  z = Math.max(1, Math.min(10, z));
+  const px = (cx - panX) / zoom, py = (cy - panY) / zoom;
+  zoom = z;
+  panX = cx - px * zoom;
+  panY = cy - py * zoom;
+  render();
+  updateZoomBtn();
+}
+
+zoomResetBtn.addEventListener("click", () => {
+  zoom = 1; panX = 0; panY = 0;
+  render();
+  updateZoomBtn();
+});
+
+let gesture = null;       // 진행 중인 터치 제스처
+let movedDist = 0;        // 제스처 이동량 (탭과 구분)
+let lastTap = { t: 0, x: 0, y: 0 };
+
+const mid = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
+const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+mapEl.addEventListener("touchstart", ev => {
+  if (ev.touches.length === 2) {
+    const [a, b] = ev.touches;
+    gesture = {
+      mode: "pinch",
+      d0: dist(a, b), c0: mid(a, b),
+      z0: zoom, panX0: panX, panY0: panY,
+      pending: null,
+    };
+  } else if (ev.touches.length === 1 && zoom > 1) {
+    const t = ev.touches[0];
+    gesture = { mode: "pan", x0: t.clientX, y0: t.clientY, panX0: panX, panY0: panY };
+  }
+}, { passive: true });
+
+mapEl.addEventListener("touchmove", ev => {
+  if (!gesture) return;
+  const rect = mapEl.getBoundingClientRect();
+  if (gesture.mode === "pinch" && ev.touches.length === 2) {
+    const [a, b] = ev.touches;
+    const z = Math.max(1, Math.min(10, gesture.z0 * dist(a, b) / gesture.d0));
+    // 시작 시 두 손가락 중심이 가리키던 지점을 현재 중심에 고정
+    const p = {
+      x: (gesture.c0.x - rect.left - gesture.panX0) / gesture.z0,
+      y: (gesture.c0.y - rect.top - gesture.panY0) / gesture.z0,
+    };
+    const c = mid(a, b);
+    const nPanX = (c.x - rect.left) - p.x * z;
+    const nPanY = (c.y - rect.top) - p.y * z;
+    gesture.pending = { z, panX: nPanX, panY: nPanY };
+    // 제스처 중에는 CSS transform으로 미리보기만 (손을 떼면 다시 그림)
+    canvasEl.style.transform =
+      `translate(${nPanX - panX}px, ${nPanY - panY}px) scale(${z / zoom})`;
+    movedDist += 5;
+  } else if (gesture.mode === "pan" && ev.touches.length === 1) {
+    const t = ev.touches[0];
+    const dx = t.clientX - gesture.x0, dy = t.clientY - gesture.y0;
+    movedDist = Math.max(movedDist, Math.abs(dx) + Math.abs(dy));
+    panX = gesture.panX0 + dx;
+    panY = gesture.panY0 + dy;
+    clampPan();
+    canvasEl.style.left = panX + "px";
+    canvasEl.style.top = panY + "px";
+  }
+}, { passive: true });
+
+mapEl.addEventListener("touchend", ev => {
+  if (gesture && gesture.mode === "pinch" && gesture.pending) {
+    zoom = gesture.pending.z;
+    panX = gesture.pending.panX;
+    panY = gesture.pending.panY;
+    render();          // 확정 배율로 다시 그리면 글자 표시 기준도 재계산됨
+    updateZoomBtn();
+  }
+  if (ev.touches.length === 0) {
+    // 더블탭: 확대 <-> 원복
+    if (movedDist < 12 && ev.changedTouches.length === 1) {
+      const t = ev.changedTouches[0];
+      const now = Date.now();
+      if (now - lastTap.t < 320 && Math.hypot(t.clientX - lastTap.x, t.clientY - lastTap.y) < 40) {
+        const rect = mapEl.getBoundingClientRect();
+        if (zoom > 1.01) { zoom = 1; panX = 0; panY = 0; render(); updateZoomBtn(); }
+        else setZoom(2.5, t.clientX - rect.left, t.clientY - rect.top);
+        lastTap = { t: 0, x: 0, y: 0 };
+      } else {
+        lastTap = { t: now, x: t.clientX, y: t.clientY };
+      }
+    }
+    gesture = null;
+    setTimeout(() => { movedDist = 0; }, 80);
+  } else if (gesture && gesture.mode === "pinch") {
+    gesture = null;
+  }
+}, { passive: true });
+
+/* 드래그/핀치 직후 발생하는 클릭이 종목 시트를 열지 않도록 차단 */
+mapEl.addEventListener("click", ev => {
+  if (movedDist >= 12) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+}, true);
+
+/* PC: 마우스 휠로 확대/축소 */
+mapEl.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const rect = mapEl.getBoundingClientRect();
+  const factor = ev.deltaY < 0 ? 1.25 : 1 / 1.25;
+  setZoom(zoom * factor, ev.clientX - rect.left, ev.clientY - rect.top);
+}, { passive: false });
 
 /* 타일 안에 종목명(+등락률)을 최대한 크게 배치. 긴 이름은 2줄로 줄바꿈 */
 function addTileText(tile, name, rate, w, h) {
@@ -461,8 +602,8 @@ mapEl.addEventListener("click", ev => {
 
 /* ---------- 갱신 루프 ---------- */
 function showError() {
-  mapEl.innerHTML =
-    `<div id="overlay-msg">데이터를 불러오지 못했습니다.<br>잠시 후 자동으로 다시 시도합니다.</div>`;
+  overlayEl.innerHTML = "데이터를 불러오지 못했습니다.<br>잠시 후 자동으로 다시 시도합니다.";
+  overlayEl.style.display = "flex";
   updatedEl.textContent = "갱신 실패";
 }
 
