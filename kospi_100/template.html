@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOSPI 100 외국인·기관 매매동향</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page:      #f9f9f7;
+    --surface:   #fcfcfb;
+    --ink:       #0b0b0b;
+    --ink-2:     #52514e;
+    --muted:     #898781;
+    --grid:      #e1e0d9;
+    --border:    rgba(11,11,11,0.10);
+    --buy:       #e34948;   /* 순매수 (한국 관례: 빨강) */
+    --sell:      #2a78d6;   /* 순매도 (파랑) */
+    --buy-rgb:   227,73,72;
+    --sell-rgb:  42,120,214;
+    --accent:    #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --muted:     #898781;
+      --grid:      #2c2c2a;
+      --border:    rgba(255,255,255,0.10);
+      --buy:       #e66767;
+      --sell:      #3987e5;
+      --buy-rgb:   230,103,103;
+      --sell-rgb:  57,135,229;
+      --accent:    #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --border:    rgba(255,255,255,0.10);
+    --buy:       #e66767;
+    --sell:      #3987e5;
+    --buy-rgb:   230,103,103;
+    --sell-rgb:  57,135,229;
+    --accent:    #3987e5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    font-size: 14px;
+    padding: 20px;
+  }
+  .wrap { max-width: 1500px; margin: 0 auto; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 700; }
+  .meta { color: var(--ink-2); font-size: 13px; }
+  .note { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+
+  /* 요약 타일 */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tile .label { color: var(--ink-2); font-size: 12px; margin-bottom: 6px; }
+  .tile .value { font-size: 24px; font-weight: 700; }
+  .tile .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .dir { display: inline-block; width: 0; height: 0; margin-right: 6px; vertical-align: 2px; }
+  .dir.up   { border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid var(--buy); }
+  .dir.down { border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 9px solid var(--sell); }
+
+  /* 컨트롤 */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; color: var(--ink-2); padding: 7px 14px;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .controls input[type="search"] {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--ink); padding: 7px 12px; font-size: 13px; width: 180px; font-family: inherit;
+  }
+  .legend { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--ink-2); font-size: 12px; }
+  .legend .bar {
+    width: 120px; height: 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: linear-gradient(to right, rgba(var(--sell-rgb),0.85), var(--surface) 50%, rgba(var(--buy-rgb),0.85));
+  }
+
+  /* 상위/하위 바 */
+  .rankrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .rankcard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .rankcard h2 { font-size: 13px; color: var(--ink-2); font-weight: 600; margin-bottom: 10px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 84px; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12.5px; }
+  .bar-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { height: 14px; position: relative; }
+  .bar-fill { position: absolute; top: 1px; bottom: 1px; border-radius: 4px; min-width: 2px; }
+  .bar-fill.buy  { background: var(--buy); }
+  .bar-fill.sell { background: var(--sell); }
+  .bar-row .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+  /* 테이블 */
+  .tablebox {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    overflow: auto; max-height: 72vh;
+  }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
+  thead th {
+    position: sticky; z-index: 3; background: var(--surface);
+    color: var(--ink-2); font-weight: 600; padding: 6px 8px;
+    border-bottom: 1px solid var(--grid); white-space: nowrap; user-select: none;
+  }
+  thead tr.r1 th { top: 0; height: 30px; text-align: center; }
+  thead tr.r2 th { top: 30px; height: 28px; text-align: right; cursor: pointer; font-weight: 500; font-size: 11.5px; }
+  thead th .arrow { color: var(--accent); font-size: 10px; }
+  tbody td {
+    padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--grid);
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  td.namecol, th.namecol {
+    position: sticky; left: 0; z-index: 2; background: var(--surface);
+    text-align: left; border-right: 1px solid var(--grid); max-width: 200px;
+  }
+  thead th.namecol { z-index: 4; top: 0; height: 58px; text-align: left; cursor: pointer; }
+  td.namecol .rk { color: var(--muted); display: inline-block; width: 26px; }
+  td.namecol .cd { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  th.grp, td.grp { border-left: 1px solid var(--grid); }
+  td.sumcol { font-weight: 700; }
+  tbody tr:hover td { filter: brightness(0.96); }
+  :root[data-theme="dark"] tbody tr:hover td { filter: brightness(1.15); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) tbody tr:hover td { filter: brightness(1.15); } }
+  td.empty { color: var(--muted); }
+
+  /* 툴팁 */
+  #tip {
+    position: fixed; display: none; z-index: 10; pointer-events: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 10px 12px; font-size: 12px;
+    color: var(--ink); min-width: 200px;
+  }
+  #tip .t-title { font-weight: 700; margin-bottom: 6px; }
+  #tip .t-row { display: flex; justify-content: space-between; gap: 16px; margin-top: 2px; }
+  #tip .t-row span:first-child { color: var(--ink-2); }
+  #tip .t-row .num { font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+  .themebtn {
+    margin-left: auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--ink-2); padding: 6px 12px; cursor: pointer; font-size: 13px; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>KOSPI 시가총액 상위 100종목 — 외국인·기관 매매동향</h1>
+    <span class="meta" id="period"></span>
+    <button class="themebtn" id="themeBtn">🌓 테마</button>
+  </header>
+  <div class="note" id="updated"></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="controls">
+    <div class="seg" id="segMet">
+      <button data-v="v" class="on">순매매금액 (억원, 추정)</button>
+      <button data-v="q">순매매량 (주)</button>
+    </div>
+    <input type="search" id="search" placeholder="종목명·코드 검색">
+    <div class="legend">
+      <span>순매도</span><div class="bar"></div><span>순매수</span>
+    </div>
+  </div>
+
+  <div class="rankrow" id="rankrow"></div>
+
+  <div class="tablebox">
+    <table id="tbl">
+      <thead>
+        <tr class="r1" id="headRow1"></tr>
+        <tr class="r2" id="headRow2"></tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    · 순매매금액은 <b>일별 순매매량 × 당일 종가</b>로 계산한 추정치입니다 (양수 = 순매수, 음수 = 순매도).<br>
+    · 데이터 출처: 네이버 증권 · 종목 구성: 실행일 기준 KOSPI 시가총액 상위 100종목 · 최근 2주 롤링 윈도우로 매일 자동 갱신됩니다.
+  </footer>
+</div>
+
+<div id="tip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const state = { met: "v", search: "", sortKey: "rank", sortDir: 1 };
+const WD = ["일","월","화","수","목","금","토"];
+const INV = [{ k: "f", name: "외국인", short: "외국인" }, { k: "o", name: "기관", short: "기관" }];
+
+function fdate(bd, withWd) {
+  const y = +bd.slice(0,4), m = +bd.slice(4,6), d = +bd.slice(6,8);
+  const s = String(m).padStart(2,"0") + "/" + String(d).padStart(2,"0");
+  return withWd ? s + "(" + WD[new Date(y, m-1, d).getDay()] + ")" : s;
+}
+function comma(n) { return (Math.round(n) || 0).toLocaleString("ko-KR"); }
+function cellVal(st, bd, inv) {
+  const d = st.days[bd];
+  if (!d) return null;
+  return d[inv + state.met];          // fv | fq | ov | oq
+}
+function sumOf(st, inv) {
+  let s = 0, has = false;
+  for (const bd of DATA.dates) { const v = cellVal(st, bd, inv); if (v !== null) { s += v; has = true; } }
+  return has ? s : null;
+}
+
+/* ---------- 헤더/메타 ---------- */
+document.getElementById("period").textContent =
+  DATA.windowStart.replaceAll("-",".") + " ~ " + DATA.windowEnd.replaceAll("-",".") +
+  " (거래일 " + DATA.dates.length + "일)";
+document.getElementById("updated").textContent =
+  "마지막 업데이트: " + DATA.updated + " · 매일 자동 갱신 (2주 롤링 윈도우)";
+
+/* ---------- 요약 타일 ---------- */
+function renderTiles() {
+  const last = DATA.dates[DATA.dates.length - 1];
+  const mk = (inv, bd) => {
+    let s = 0;
+    for (const st of DATA.stocks) { const d = st.days[bd]; if (d) s += d[inv + "v"]; }
+    return s;
+  };
+  const cum = inv => {
+    let s = 0;
+    for (const st of DATA.stocks) for (const bd of DATA.dates) { const d = st.days[bd]; if (d) s += d[inv + "v"]; }
+    return s;
+  };
+  const tile = (label, v, sub) => `
+    <div class="tile">
+      <div class="label">${label}</div>
+      <div class="value"><span class="dir ${v >= 0 ? "up" : "down"}"></span>${comma(v)} <span style="font-size:13px;font-weight:400;color:var(--muted)">억원</span></div>
+      <div class="sub">${sub}</div>
+    </div>`;
+  const lastLabel = fdate(last, true);
+  document.getElementById("tiles").innerHTML =
+    tile("외국인 순매매 · 최근 거래일", mk("f", last), lastLabel + " · 100종목 합계 (추정)") +
+    tile("기관 순매매 · 최근 거래일",   mk("o", last), lastLabel + " · 100종목 합계 (추정)") +
+    tile("외국인 순매매 · 2주 누적",    cum("f"), "기간 전체 · 100종목 합계 (추정)") +
+    tile("기관 순매매 · 2주 누적",      cum("o"), "기간 전체 · 100종목 합계 (추정)");
+}
+
+/* ---------- 상위/하위 5 (외국인·기관 각각) ---------- */
+function renderRank() {
+  let html = "";
+  let maxAbs = 1;
+  const byInv = {};
+  for (const { k } of INV) {
+    const rows = DATA.stocks.map(st => {
+      let s = 0;
+      for (const bd of DATA.dates) { const d = st.days[bd]; if (d) s += d[k + "v"]; }
+      return { name: st.name, v: s };
+    }).sort((a, b) => b.v - a.v);
+    byInv[k] = rows;
+    maxAbs = Math.max(maxAbs, ...rows.map(r => Math.abs(r.v)));
+  }
+  const bar = (r, cls) => `
+    <div class="bar-row">
+      <div class="nm" title="${r.name}">${r.name}</div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="left:0;width:${Math.max(2, Math.abs(r.v) / maxAbs * 100)}%"></div></div>
+      <div class="val">${comma(r.v)} 억</div>
+    </div>`;
+  for (const { k, name } of INV) {
+    const rows = byInv[k];
+    const buys = rows.slice(0, 5).filter(r => r.v > 0);
+    const sells = rows.slice(-5).filter(r => r.v < 0).sort((a, b) => a.v - b.v);
+    html += `<div class="rankcard"><h2>${name} 2주 누적 순매수 상위 5</h2>${buys.map(r => bar(r, "buy")).join("") || '<span style="color:var(--muted)">해당 없음</span>'}</div>`;
+    html += `<div class="rankcard"><h2>${name} 2주 누적 순매도 상위 5</h2>${sells.map(r => bar(r, "sell")).join("") || '<span style="color:var(--muted)">해당 없음</span>'}</div>`;
+  }
+  document.getElementById("rankrow").innerHTML = html;
+}
+
+/* ---------- 테이블 ---------- */
+function heatMax() {
+  const vals = [];
+  for (const st of DATA.stocks)
+    for (const bd of DATA.dates)
+      for (const { k } of INV) { const v = cellVal(st, bd, k); if (v !== null && v !== 0) vals.push(Math.abs(v)); }
+  if (!vals.length) return 1;
+  vals.sort((a, b) => a - b);
+  return vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1];
+}
+
+function renderTable() {
+  const vmax = heatMax();
+  const arrow = k => state.sortKey === k ? ` <span class="arrow">${state.sortDir < 0 ? "▼" : "▲"}</span>` : "";
+
+  // 헤더 1행: 날짜 (colspan 2), 2행: 외국인/기관
+  let h1 = `<th class="namecol" rowspan="2" data-k="rank">종목${arrow("rank")}</th>`;
+  let h2 = "";
+  for (const bd of DATA.dates) {
+    h1 += `<th colspan="2" class="grp">${fdate(bd, true)}</th>`;
+    h2 += `<th class="grp" data-k="${bd}_f">외국인${arrow(bd + "_f")}</th><th data-k="${bd}_o">기관${arrow(bd + "_o")}</th>`;
+  }
+  h1 += `<th colspan="2" class="grp">2주 합계</th>`;
+  h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
+  document.getElementById("headRow1").innerHTML = h1;
+  document.getElementById("headRow2").innerHTML = h2;
+
+  // 정렬 + 필터
+  const q = state.search.trim().toLowerCase();
+  let rows = DATA.stocks.filter(st => !q || st.name.toLowerCase().includes(q) || st.code.includes(q));
+  rows = rows.map(st => ({ st, sumF: sumOf(st, "f"), sumO: sumOf(st, "o") }));
+  rows.sort((a, b) => {
+    let av, bv;
+    if (state.sortKey === "rank") { av = a.st.rank; bv = b.st.rank; }
+    else if (state.sortKey === "sum_f") { av = a.sumF ?? -Infinity; bv = b.sumF ?? -Infinity; }
+    else if (state.sortKey === "sum_o") { av = a.sumO ?? -Infinity; bv = b.sumO ?? -Infinity; }
+    else {
+      const [bd, inv] = state.sortKey.split("_");
+      av = cellVal(a.st, bd, inv) ?? -Infinity; bv = cellVal(b.st, bd, inv) ?? -Infinity;
+    }
+    return (av - bv) * state.sortDir;
+  });
+
+  // 본문
+  const cell = (st, bd, inv, cls) => {
+    const v = cellVal(st, bd, inv);
+    if (v === null) return `<td class="empty ${cls}">–</td>`;
+    const a = Math.min(1, Math.abs(v) / vmax) * 0.55;
+    const bg = v > 0 ? `rgba(var(--buy-rgb),${a.toFixed(3)})` : v < 0 ? `rgba(var(--sell-rgb),${a.toFixed(3)})` : "transparent";
+    return `<td class="${cls}" data-c="${st.code}" data-d="${bd}" style="background:${bg}">${comma(v)}</td>`;
+  };
+  const frag = [];
+  for (const { st, sumF, sumO } of rows) {
+    let tr = `<tr><td class="namecol"><span class="rk">${st.rank}</span><b>${st.name}</b><span class="cd">${st.code}</span></td>`;
+    for (const bd of DATA.dates) {
+      tr += cell(st, bd, "f", "grp");
+      tr += cell(st, bd, "o", "");
+    }
+    tr += `<td class="sumcol grp">${sumF === null ? "–" : comma(sumF)}</td>`;
+    tr += `<td class="sumcol">${sumO === null ? "–" : comma(sumO)}</td></tr>`;
+    frag.push(tr);
+  }
+  document.getElementById("body").innerHTML = frag.join("");
+}
+
+/* ---------- 이벤트 ---------- */
+document.getElementById("segMet").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  for (const x of b.parentElement.children) x.classList.remove("on");
+  b.classList.add("on");
+  state.met = b.dataset.v;
+  renderTable();
+});
+
+document.getElementById("search").addEventListener("input", e => {
+  state.search = e.target.value; renderTable();
+});
+
+function onHeadClick(e) {
+  const th = e.target.closest("th[data-k]"); if (!th) return;
+  const k = th.dataset.k;
+  if (state.sortKey === k) state.sortDir *= -1;
+  else { state.sortKey = k; state.sortDir = k === "rank" ? 1 : -1; }
+  renderTable();
+}
+document.getElementById("headRow1").addEventListener("click", onHeadClick);
+document.getElementById("headRow2").addEventListener("click", onHeadClick);
+
+/* 툴팁 */
+const tip = document.getElementById("tip");
+document.getElementById("body").addEventListener("mousemove", e => {
+  const td = e.target.closest("td[data-c]");
+  if (!td) { tip.style.display = "none"; return; }
+  const st = DATA.stocks.find(s => s.code === td.dataset.c);
+  const d = st.days[td.dataset.d];
+  tip.innerHTML = `
+    <div class="t-title">${st.name} · ${fdate(td.dataset.d, true)}</div>
+    <div class="t-row"><span>종가</span><span class="num">${comma(d.close)} 원</span></div>
+    <div class="t-row"><span>외국인 순매매량</span><span class="num">${comma(d.fq)} 주</span></div>
+    <div class="t-row"><span>외국인 순매매금액</span><span class="num">${comma(d.fv)} 억원</span></div>
+    <div class="t-row"><span>기관 순매매량</span><span class="num">${comma(d.oq)} 주</span></div>
+    <div class="t-row"><span>기관 순매매금액</span><span class="num">${comma(d.ov)} 억원</span></div>`;
+  tip.style.display = "block";
+  const w = tip.offsetWidth, hgt = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+  if (y + hgt > innerHeight - 8) y = e.clientY - hgt - 14;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+});
+document.getElementById("body").addEventListener("mouseleave", () => tip.style.display = "none");
+
+/* 테마 토글 */
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const r = document.documentElement;
+  const cur = r.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  r.dataset.theme = cur === "dark" ? "light" : "dark";
+});
+
+renderTiles(); renderRank(); renderTable();
+</script>
+</body>
+</html>
