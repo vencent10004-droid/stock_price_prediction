@@ -14,6 +14,13 @@
 | `run_update.bat` | 작업 스케줄러가 매일 호출하는 배치 파일 |
 | `update_log.txt` | 자동 실행 로그 |
 
+## 외부 배포 (GitHub Pages)
+
+- **대시보드 URL**: https://vencent10004-droid.github.io/stock_price_prediction/kospi100/
+- GitHub Actions 워크플로(`update-kospi100.yml`)가 **평일 KST 18:30 클라우드에서 직접 수집**해
+  `docs/kospi100/` 에 배포합니다 — 로컬 PC가 꺼져 있어도 매일 갱신됩니다.
+- 저장소: https://github.com/vencent10004-droid/stock_price_prediction (`kospi_100/` 폴더)
+
 ## 동작 방식
 
 - **데이터 출처**: 네이버 증권 (m.stock.naver.com)

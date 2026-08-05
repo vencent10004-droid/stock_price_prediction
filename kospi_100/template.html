@@ -143,6 +143,45 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) tbody tr:hover td { filter: brightness(1.15); } }
   td.empty { color: var(--muted); }
 
+  /* 모바일 */
+  .daysel { display: none; }
+  @media (max-width: 768px) {
+    body { padding: 10px; font-size: 13px; }
+    h1 { font-size: 15px; }
+    .meta { font-size: 11px; }
+    .note { font-size: 11px; }
+    .tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tile { padding: 10px 12px; }
+    .tile .value { font-size: 17px; }
+    .tile .sub { font-size: 10.5px; }
+    .rankrow { grid-template-columns: 1fr; gap: 8px; }
+    .rankcard { padding: 10px 12px; }
+    .bar-row { grid-template-columns: 84px 1fr 76px; font-size: 11.5px; }
+    .controls { gap: 6px; }
+    .seg button { padding: 7px 10px; font-size: 12px; }
+    .controls input[type="search"] { width: 0; flex: 1; min-width: 90px; }
+    .legend { margin-left: 0; width: 100%; }
+    .daysel {
+      display: inline-block; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--ink); padding: 7px 10px; font-size: 12px; font-family: inherit;
+    }
+    td.namecol, th.namecol { max-width: 122px; }
+    td.namecol .cd { display: none; }
+    td.namecol .rk { width: 20px; font-size: 10.5px; }
+    tbody td { padding: 9px 6px; }
+    thead tr.r2 th { font-size: 10.5px; }
+    thead th.namecol { height: 58px; }
+    .tablebox { max-height: none; }
+    td.detailcell { padding: 0; }
+    .detail-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .detail-tbl th { color: var(--muted); font-weight: 500; font-size: 10.5px; }
+    .detail-tbl td, .detail-tbl th { padding: 5px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
+    .detail-tbl td:first-child, .detail-tbl th:first-child { text-align: left; color: var(--ink-2); }
+    .hint { color: var(--muted); font-size: 11px; margin: 6px 0 8px; }
+  }
+  .hint { display: none; }
+  @media (max-width: 768px) { .hint { display: block; } }
+
   /* 툴팁 */
   #tip {
     position: fixed; display: none; z-index: 10; pointer-events: none;
@@ -178,6 +217,7 @@
       <button data-v="v" class="on">순매매금액 (억원, 추정)</button>
       <button data-v="q">순매매량 (주)</button>
     </div>
+    <select id="daySel" class="daysel"></select>
     <input type="search" id="search" placeholder="종목명·코드 검색">
     <div class="legend">
       <span>순매도</span><div class="bar"></div><span>순매수</span>
@@ -185,6 +225,8 @@
   </div>
 
   <div class="rankrow" id="rankrow"></div>
+
+  <div class="hint">종목을 탭하면 일별 상세 내역이 펼쳐집니다.</div>
 
   <div class="tablebox">
     <table id="tbl">
@@ -207,9 +249,10 @@
 <script>
 const DATA = /*__DATA__*/null;
 
-const state = { met: "v", search: "", sortKey: "rank", sortDir: 1 };
+const state = { met: "v", search: "", sortKey: "rank", sortDir: 1, day: null };
 const WD = ["일","월","화","수","목","금","토"];
 const INV = [{ k: "f", name: "외국인", short: "외국인" }, { k: "o", name: "기관", short: "기관" }];
+const mqMobile = matchMedia("(max-width: 768px)");
 
 function fdate(bd, withWd) {
   const y = +bd.slice(0,4), m = +bd.slice(4,6), d = +bd.slice(6,8);
@@ -303,7 +346,7 @@ function heatMax() {
   return vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1];
 }
 
-function renderTable() {
+function renderTableDesktop() {
   const vmax = heatMax();
   const arrow = k => state.sortKey === k ? ` <span class="arrow">${state.sortDir < 0 ? "▼" : "▲"}</span>` : "";
 
@@ -357,6 +400,55 @@ function renderTable() {
   document.getElementById("body").innerHTML = frag.join("");
 }
 
+/* ---------- 모바일: 선택일 + 2주 합계 컴팩트 표 ---------- */
+function cellTint(v, vmax) {
+  if (v === null || v === 0) return "";
+  const a = Math.min(1, Math.abs(v) / vmax) * 0.55;
+  return v > 0 ? `background:rgba(var(--buy-rgb),${a.toFixed(3)})` : `background:rgba(var(--sell-rgb),${a.toFixed(3)})`;
+}
+
+function renderTableMobile() {
+  const vmax = heatMax();
+  const day = state.day || DATA.dates[DATA.dates.length - 1];
+  const arrow = k => state.sortKey === k ? ` <span class="arrow">${state.sortDir < 0 ? "▼" : "▲"}</span>` : "";
+
+  let h1 = `<th class="namecol" rowspan="2" data-k="rank">종목${arrow("rank")}</th>`;
+  h1 += `<th colspan="2" class="grp">${fdate(day, true)}</th><th colspan="2" class="grp">2주 합계</th>`;
+  let h2 = `<th class="grp" data-k="${day}_f">외국인${arrow(day + "_f")}</th><th data-k="${day}_o">기관${arrow(day + "_o")}</th>`;
+  h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
+  document.getElementById("headRow1").innerHTML = h1;
+  document.getElementById("headRow2").innerHTML = h2;
+
+  const q = state.search.trim().toLowerCase();
+  let rows = DATA.stocks.filter(st => !q || st.name.toLowerCase().includes(q) || st.code.includes(q));
+  rows = rows.map(st => ({ st, sumF: sumOf(st, "f"), sumO: sumOf(st, "o") }));
+  rows.sort((a, b) => {
+    let av, bv;
+    if (state.sortKey === "rank") { av = a.st.rank; bv = b.st.rank; }
+    else if (state.sortKey === "sum_f") { av = a.sumF ?? -Infinity; bv = b.sumF ?? -Infinity; }
+    else if (state.sortKey === "sum_o") { av = a.sumO ?? -Infinity; bv = b.sumO ?? -Infinity; }
+    else {
+      const [bd, inv] = state.sortKey.split("_");
+      av = cellVal(a.st, bd, inv) ?? -Infinity; bv = cellVal(b.st, bd, inv) ?? -Infinity;
+    }
+    return (av - bv) * state.sortDir;
+  });
+
+  const cellHtml = (v, cls) => v === null ? `<td class="empty ${cls}">–</td>` : `<td class="${cls}" style="${cellTint(v, vmax)}">${comma(v)}</td>`;
+  const frag = [];
+  for (const { st, sumF, sumO } of rows) {
+    let tr = `<tr class="mrow" data-code="${st.code}"><td class="namecol"><span class="rk">${st.rank}</span><b>${st.name}</b></td>`;
+    tr += cellHtml(cellVal(st, day, "f"), "grp") + cellHtml(cellVal(st, day, "o"), "");
+    tr += cellHtml(sumF, "grp") + cellHtml(sumO, "") + `</tr>`;
+    frag.push(tr);
+  }
+  document.getElementById("body").innerHTML = frag.join("");
+}
+
+function renderTable() {
+  if (mqMobile.matches) renderTableMobile(); else renderTableDesktop();
+}
+
 /* ---------- 이벤트 ---------- */
 document.getElementById("segMet").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -379,6 +471,36 @@ function onHeadClick(e) {
 }
 document.getElementById("headRow1").addEventListener("click", onHeadClick);
 document.getElementById("headRow2").addEventListener("click", onHeadClick);
+
+/* 모바일: 날짜 선택 + 종목 탭 → 일별 상세 */
+const daySel = document.getElementById("daySel");
+daySel.innerHTML = [...DATA.dates].reverse().map(bd => `<option value="${bd}">${fdate(bd, true)}</option>`).join("");
+state.day = DATA.dates[DATA.dates.length - 1];
+daySel.addEventListener("change", () => { state.day = daySel.value; state.sortKey = "rank"; state.sortDir = 1; renderTable(); });
+mqMobile.addEventListener("change", renderTable);
+
+document.getElementById("body").addEventListener("click", e => {
+  if (!mqMobile.matches) return;
+  const tr = e.target.closest("tr.mrow"); if (!tr) return;
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("detail")) { next.remove(); return; }
+  document.querySelectorAll("#body tr.detail").forEach(x => x.remove());
+  const st = DATA.stocks.find(s => s.code === tr.dataset.code);
+  const vmax = heatMax();
+  const unit = state.met === "v" ? "억원" : "주";
+  let rows = "";
+  for (const bd of [...DATA.dates].reverse()) {
+    const d = st.days[bd];
+    if (!d) { rows += `<tr><td>${fdate(bd, true)}</td><td>–</td><td>–</td></tr>`; continue; }
+    const f = d["f" + state.met], o = d["o" + state.met];
+    rows += `<tr><td>${fdate(bd, true)}</td><td style="${cellTint(f, vmax)}">${comma(f)}</td><td style="${cellTint(o, vmax)}">${comma(o)}</td></tr>`;
+  }
+  const det = document.createElement("tr");
+  det.className = "detail";
+  det.innerHTML = `<td colspan="5" class="detailcell"><table class="detail-tbl">
+    <tr><th>${st.name} · 일별 (${unit})</th><th>외국인</th><th>기관</th></tr>${rows}</table></td>`;
+  tr.after(det);
+});
 
 /* 툴팁 */
 const tip = document.getElementById("tip");

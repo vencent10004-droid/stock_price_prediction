@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/update-kospi100.yml"
+      - "kospi_100/template.html"
+      - "kospi_100/update_dashboard.py"
   workflow_dispatch:
 
 concurrency:
