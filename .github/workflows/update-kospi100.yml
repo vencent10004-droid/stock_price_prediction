@@ -1,0 +1,51 @@
+name: Update KOSPI 100 dashboard
+
+on:
+  schedule:
+    # KST 18:30 (UTC 09:30) 평일 — 장 마감 후 투자자 데이터 확정 시점
+    - cron: "30 9 * * 1-5"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-kospi100.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: update-kospi100
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Update dashboard
+        run: python kospi_100/update_dashboard.py
+
+      - name: Publish to docs (GitHub Pages)
+        run: |
+          mkdir -p docs/kospi100
+          cp kospi_100/dashboard.html docs/kospi100/index.html
+          cp kospi_100/data.json docs/kospi100/data.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/kospi100 kospi_100/dashboard.html kospi_100/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update KOSPI 100 dashboard"
+            git pull --rebase origin main
+            git push
+          fi
