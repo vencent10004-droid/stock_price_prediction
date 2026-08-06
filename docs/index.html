@@ -4,13 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b120d">
-<title>KOSPI 100 실시간 히트맵</title>
-<link rel="stylesheet" href="style.css?v=8">
+<title>코스피·코스닥 실시간 히트맵</title>
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header>
-    <div class="brand">KOSPI<span>100</span> MAP</div>
-    <div id="modeSeg">
+    <div class="brand">KRX<span>MAP</span></div>
+    <div id="marketSeg" class="seg">
+      <button data-market="KOSPI" class="active">코스피 100</button>
+      <button data-market="KOSDAQ">코스닥 50</button>
+    </div>
+    <div id="modeSeg" class="seg">
       <button data-mode="regular" class="active">정규장</button>
       <button data-mode="over">시간외</button>
     </div>
@@ -51,6 +55,6 @@
     <a id="shLink" target="_blank" rel="noopener">네이버 증권에서 보기 →</a>
   </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

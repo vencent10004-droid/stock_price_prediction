@@ -42,7 +42,7 @@ jobs:
               break
             fi
             python scripts/update_heatmap_data.py || true
-            git add docs/data.json docs/sectors.json
+            git add "docs/*.json"
             if ! git diff --cached --quiet; then
               if [ "$first" = "1" ]; then
                 git commit -q -m "data snapshot"

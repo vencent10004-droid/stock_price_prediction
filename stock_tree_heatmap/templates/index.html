@@ -3,13 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KOSPI 100 실시간 히트맵</title>
+<title>코스피·코스닥 실시간 히트맵</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
-    <div class="brand">KOSPI<span>100</span> MAP</div>
-    <div id="modeSeg">
+    <div class="brand">KRX<span>MAP</span></div>
+    <div id="marketSeg" class="seg">
+      <button data-market="KOSPI" class="active">코스피 100</button>
+      <button data-market="KOSDAQ">코스닥 50</button>
+    </div>
+    <div id="modeSeg" class="seg">
       <button data-mode="regular" class="active">정규장</button>
       <button data-mode="over">시간외</button>
     </div>

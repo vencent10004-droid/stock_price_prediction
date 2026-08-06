@@ -16,6 +16,35 @@ let lastData = null;
 let paused = false;
 let remain = Number(intervalSel.value);
 
+/* ---------- 시장 전환 (코스피 100 / 코스닥 50) ---------- */
+let market = localStorage.getItem("market");
+if (market !== "KOSPI" && market !== "KOSDAQ") market = "KOSPI";
+const marketSeg = document.getElementById("marketSeg");
+function syncMarketSeg() {
+  for (const b of marketSeg.querySelectorAll("button")) {
+    b.classList.toggle("active", b.dataset.market === market);
+  }
+}
+marketSeg.addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (!btn || btn.dataset.market === market) return;
+  market = btn.dataset.market;
+  try { localStorage.setItem("market", market); } catch (e) { /* 무시 */ }
+  syncMarketSeg();
+  // 시장이 바뀌면 화면 초기화 후 즉시 재조회
+  lastData = null;
+  modeAutoSet = false;
+  zoom = 1; panX = 0; panY = 0;
+  updateZoomBtn();
+  canvasEl.innerHTML = "";
+  kospiEl.innerHTML = "";
+  overlayEl.innerHTML = "시세 데이터를 불러오는 중…";
+  overlayEl.style.display = "flex";
+  remain = Number(intervalSel.value);
+  refresh();
+});
+syncMarketSeg();
+
 /* ---------- 정규장/시간외(프리·애프터마켓) 보기 전환 ---------- */
 let viewMode = "regular";   // 'regular' | 'over'
 let modeAutoSet = false;    // 최초 데이터 기준 자동 선택은 한 번만
@@ -409,9 +438,10 @@ function buildLegend() {
 /* ---------- 데이터 갱신 루프 ---------- */
 async function refresh() {
   try {
-    const res = await fetch("/api/heatmap");
+    const res = await fetch(`/api/heatmap?market=${market}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+    if (data.market && data.market !== market) return;  // 조회 중 시장이 바뀐 경우 폐기
     lastData = data;
     // 시간외 세션 이름(프리마켓/애프터마켓)을 버튼에 반영
     const withOv = data.stocks.find(s => s.ov && s.ov.session);
@@ -427,7 +457,7 @@ async function refresh() {
       const k = data.kospi;
       const cls = k.rate >= 0 ? "up" : "down";
       kospiEl.innerHTML =
-        `KOSPI <b>${k.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(k.rate)}</span>`;
+        `${market} <b>${k.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(k.rate)}</span>`;
     }
     render();
   } catch (e) {

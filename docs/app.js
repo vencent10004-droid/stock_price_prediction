@@ -4,7 +4,13 @@
  */
 "use strict";
 
-const TOP_N = 100;
+/* ---------- 시장 전환 (코스피 100 / 코스닥 50) ---------- */
+const MARKETS = {
+  KOSPI: { topN: 100, dataFile: "data.json", sectorFile: "sectors.json" },
+  KOSDAQ: { topN: 50, dataFile: "data_kosdaq.json", sectorFile: "sectors_kosdaq.json" },
+};
+let market = localStorage.getItem("market");
+if (!MARKETS[market]) market = "KOSPI";
 
 /* 전용 프록시(Cloudflare Workers 등)를 배포했다면 여기에 URL을 넣으세요.
  * 예: "https://내이름.workers.dev/?url="  (repo의 proxy/cloudflare-worker.js 참고)
@@ -57,9 +63,35 @@ const liveBadge = document.getElementById("liveBadge");
 const sheet = document.getElementById("sheet");
 
 let lastData = null;
-let sectorMap = null;
+const sectorMaps = {};      // 시장별 업종 매핑 캐시
 let paused = false;
 let remain = Number(intervalSel.value);
+
+const marketSeg = document.getElementById("marketSeg");
+function syncMarketSeg() {
+  for (const b of marketSeg.querySelectorAll("button")) {
+    b.classList.toggle("active", b.dataset.market === market);
+  }
+}
+marketSeg.addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (!btn || btn.dataset.market === market) return;
+  market = btn.dataset.market;
+  try { localStorage.setItem("market", market); } catch (e) { /* 무시 */ }
+  syncMarketSeg();
+  // 시장이 바뀌면 화면 초기화 후 즉시 재조회
+  lastData = null;
+  modeAutoSet = false;
+  zoom = 1; panX = 0; panY = 0;
+  updateZoomBtn();
+  canvasEl.innerHTML = "";
+  kospiEl.innerHTML = "";
+  overlayEl.innerHTML = "시세 데이터를 불러오는 중…";
+  overlayEl.style.display = "flex";
+  remain = Number(intervalSel.value);
+  refresh();
+});
+syncMarketSeg();
 
 /* ---------- 정규장/시간외(프리·애프터마켓) 보기 전환 ---------- */
 let viewMode = "regular";   // 'regular' | 'over'
@@ -169,17 +201,17 @@ async function fetchJson(url, timeoutMs = 8000) {
   }
 }
 
-async function getSectorMap() {
-  if (sectorMap) return sectorMap;
+async function getSectorMap(m) {
+  if (sectorMaps[m]) return sectorMaps[m];
   try {
-    sectorMap = await fetchJson(`sectors.json?_=${Date.now()}`);
+    sectorMaps[m] = await fetchJson(`${MARKETS[m].sectorFile}?_=${Date.now()}`);
   } catch (e) {
-    sectorMap = {};
+    sectorMaps[m] = {};
   }
-  return sectorMap;
+  return sectorMaps[m];
 }
 
-function parseStocks(rows, secs) {
+function parseStocks(rows, secs, topN) {
   const stocks = [];
   for (const s of rows) {
     const code = s.itemCode || "";
@@ -205,32 +237,34 @@ function parseStocks(rows, secs) {
         status: o.overMarketStatus || "",
       },
     });
-    if (stocks.length >= TOP_N) break;
+    if (stocks.length >= topN) break;
   }
   return stocks;
 }
 
-async function loadRealtime() {
-  const secs = await getSectorMap();
+async function loadRealtime(m) {
+  const cfg = MARKETS[m];
+  const secs = await getSectorMap(m);
   const ts = Date.now();
   const okList = d => d && d.stocks && d.stocks.length > 0;
   const pages = await Promise.all([1, 2].map(p =>
     fetchViaProxies(
-      `https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=${p}&pageSize=100&_=${ts}`,
+      `https://m.stock.naver.com/api/stocks/marketValue/${m}?page=${p}&pageSize=100&_=${ts}`,
       okList)
   ));
-  const stocks = parseStocks(pages.flatMap(d => d.stocks || []), secs);
-  if (stocks.length < 50) throw new Error("종목 수 부족");
+  const stocks = parseStocks(pages.flatMap(d => d.stocks || []), secs, cfg.topN);
+  if (stocks.length < cfg.topN / 2) throw new Error("종목 수 부족");
 
   let kospi = null;
   try {
     const k = await fetchViaProxies(
-      `https://m.stock.naver.com/api/index/KOSPI/basic?_=${ts}`,
+      `https://m.stock.naver.com/api/index/${m}/basic?_=${ts}`,
       d => d && d.closePrice);
     kospi = { value: num(k.closePrice), rate: num(k.fluctuationsRatio) };
   } catch (e) { /* 지수는 없어도 무방 */ }
 
   return {
+    market: m,
     updated: new Date().toTimeString().slice(0, 8),
     kospi,
     stocks,
@@ -239,22 +273,24 @@ async function loadRealtime() {
 }
 
 /* Actions가 장중 60초마다 갱신하는 data 브랜치 (raw는 CORS 허용이라 프록시 불필요) */
-const RAW_DATA_URL =
-  "https://raw.githubusercontent.com/vencent10004-droid/stock_price_prediction/data/docs/data.json";
+const RAW_BASE =
+  "https://raw.githubusercontent.com/vencent10004-droid/stock_price_prediction/data/docs/";
 
-async function loadSnapshot() {
+async function loadSnapshot(m) {
+  const file = MARKETS[m].dataFile;
   const tryFetch = url =>
     fetchJson(url, 6000).then(d => (d && d.stocks && d.stocks.length ? d : null)).catch(() => null);
   // 분 단위 데이터(raw)와 5분 단위 데이터(Pages)를 동시에 받아 더 최신 쪽 사용
   const [rawD, localD] = await Promise.all([
-    tryFetch(`${RAW_DATA_URL}?_=${Date.now()}`),
-    tryFetch(`data.json?_=${Date.now()}`),
+    tryFetch(`${RAW_BASE}${file}?_=${Date.now()}`),
+    tryFetch(`${file}?_=${Date.now()}`),
   ]);
   let d;
   if (rawD && localD) d = (rawD.updated || "") >= (localD.updated || "") ? rawD : localD;
   else d = rawD || localD;
   if (!d) throw new Error("빈 데이터");
   return {
+    market: m,
     updated: (d.updated || "").slice(11) || "-",
     updatedFull: d.updated || "",
     kospi: d.kospi,
@@ -273,6 +309,7 @@ function fmtRate(rate) {
 }
 
 function apply(data) {
+  if (data.market !== market) return;  // 조회 중 시장이 바뀐 경우 폐기
   lastData = data;
   // 시간외 세션 이름(프리마켓/애프터마켓)을 버튼에 반영
   const withOv = data.stocks.find(s => s.ov && s.ov.session);
@@ -305,7 +342,7 @@ function apply(data) {
   if (data.kospi && data.kospi.value) {
     const cls = data.kospi.rate >= 0 ? "up" : "down";
     kospiEl.innerHTML =
-      `KOSPI <b>${data.kospi.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(data.kospi.rate)}</span>`;
+      `${data.market} <b>${data.kospi.value.toLocaleString()}</b> <span class="${cls}">${fmtRate(data.kospi.rate)}</span>`;
   }
   render();
 }
@@ -638,19 +675,20 @@ function showError() {
 }
 
 async function refresh() {
+  const m = market;
   // 실시간 데이터가 아직 없으면 같은 저장소의 스냅숏을 병행 로드해서 먼저 그림
   let snapPromise = null;
   if (!lastData || !lastData.live) {
-    snapPromise = loadSnapshot()
+    snapPromise = loadSnapshot(m)
       .then(d => { if (!lastData || !lastData.live) apply(d); })
       .catch(() => {});
   }
   try {
-    apply(await loadRealtime());   // 실시간이 받아지면 스냅숏을 덮어씀
+    apply(await loadRealtime(m));   // 실시간이 받아지면 스냅숏을 덮어씀
   } catch (e) {
     if (snapPromise) await snapPromise;
-    if (!lastData) showError();
-    else if (lastData.live) updatedEl.textContent = "갱신 실패 (이전 데이터 표시)";
+    if (!lastData && m === market) showError();
+    else if (lastData && lastData.live) updatedEl.textContent = "갱신 실패 (이전 데이터 표시)";
   }
 }
 

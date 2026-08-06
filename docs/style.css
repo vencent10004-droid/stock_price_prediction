@@ -33,13 +33,13 @@ header {
 }
 .brand span { color: #7ee08a; }
 
-#modeSeg {
+.seg {
   display: flex;
   border: 1px solid #2a382e;
   border-radius: 5px;
   overflow: hidden;
 }
-#modeSeg button {
+.seg button {
   background: #0f1811;
   color: #8d968f;
   border: none;
@@ -48,7 +48,7 @@ header {
   padding: 4px 10px;
   cursor: pointer;
 }
-#modeSeg button.active { background: #1d3a25; color: #8fe89b; }
+.seg button.active { background: #1d3a25; color: #8fe89b; }
 
 .kospi-chip { font-size: 12px; color: #cdd6cf; }
 .kospi-chip b { font-size: 13px; }
