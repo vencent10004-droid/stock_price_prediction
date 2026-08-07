@@ -4,10 +4,12 @@ name: Heatmap minute updater
 # 페이지는 raw.githubusercontent.com(data 브랜치)에서 CORS 제약 없이 읽는다.
 on:
   schedule:
-    # KST 08:00/08:30 (UTC 전날 23시, 일~목)
-    - cron: "0,30 23 * * 0-4"
-    # KST 09:00~19:30 매시 0분/30분 (UTC 00~10시)
-    - cron: "0,30 0-10 * * 1-5"
+    # 정각은 GitHub 예약 실행이 가장 몰려 지연/누락이 잦으므로 7분/37분 사용
+    # KST 07:57, 08:07, 08:37 (UTC 전날 22~23시, 일~목)
+    - cron: "57 22 * * 0-4"
+    - cron: "7,37 23 * * 0-4"
+    # KST 09:07~19:37 매시 7분/37분 (UTC 00~10시)
+    - cron: "7,37 0-10 * * 1-5"
   workflow_dispatch:
 
 concurrency:
