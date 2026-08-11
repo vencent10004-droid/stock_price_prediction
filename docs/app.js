@@ -189,11 +189,11 @@ function num(text, def = 0) {
   return isNaN(v) ? def : v;
 }
 
-async function fetchJson(url, timeoutMs = 8000) {
+async function fetchJson(url, timeoutMs = 8000, headers) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store", headers });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } finally {
@@ -276,18 +276,29 @@ async function loadRealtime(m) {
 const RAW_BASE =
   "https://raw.githubusercontent.com/vencent10004-droid/stock_price_prediction/data/docs/";
 
+let lastApiFetch = 0;   // GitHub API는 비인증 시간당 60회 제한 → 70초에 1회만
+
 async function loadSnapshot(m) {
   const file = MARKETS[m].dataFile;
-  const tryFetch = url =>
-    fetchJson(url, 6000).then(d => (d && d.stocks && d.stocks.length ? d : null)).catch(() => null);
-  // 분 단위 데이터(raw)와 5분 단위 데이터(Pages)를 동시에 받아 더 최신 쪽 사용
-  const [rawD, localD] = await Promise.all([
+  const tryFetch = (url, headers) =>
+    fetchJson(url, 6000, headers).then(d => (d && d.stocks && d.stocks.length ? d : null)).catch(() => null);
+  // 세 경로를 동시에 시도해 가장 최신 데이터 사용:
+  // raw(분 단위, 일부 통신망에서 차단됨) / Pages(5분 단위) / GitHub API(분 단위, 횟수 제한)
+  const cands = [
     tryFetch(`${RAW_BASE}${file}?_=${Date.now()}`),
     tryFetch(`${file}?_=${Date.now()}`),
-  ]);
-  let d;
-  if (rawD && localD) d = (rawD.updated || "") >= (localD.updated || "") ? rawD : localD;
-  else d = rawD || localD;
+  ];
+  if (Date.now() - lastApiFetch > 70000) {
+    lastApiFetch = Date.now();
+    cands.push(tryFetch(
+      `https://api.github.com/repos/vencent10004-droid/stock_price_prediction/contents/docs/${file}?ref=data`,
+      { Accept: "application/vnd.github.raw+json" }));
+  }
+  const results = await Promise.all(cands);
+  let d = null;
+  for (const r of results) {
+    if (r && (!d || (r.updated || "") > (d.updated || ""))) d = r;
+  }
   if (!d) throw new Error("빈 데이터");
   return {
     market: m,
@@ -310,6 +321,7 @@ function fmtRate(rate) {
 
 function apply(data) {
   if (data.market !== market) return;  // 조회 중 시장이 바뀐 경우 폐기
+  data.fetchedAt = Date.now();
   lastData = data;
   // 시간외 세션 이름(프리마켓/애프터마켓)을 버튼에 반영
   const withOv = data.stocks.find(s => s.ov && s.ov.session);
@@ -320,12 +332,19 @@ function apply(data) {
     modeAutoSet = true;
     if (data.stocks.some(s => s.ov && s.ov.status === "OPEN")) setMode("over");
   }
-  updatedEl.textContent = "업데이트 " + data.updated;
+  // 오늘 데이터가 아니면 날짜까지 표시해서 혼동 방지
+  let label = data.updated;
+  if (data.updatedFull) {
+    const n = new Date();
+    const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+    if (!data.updatedFull.startsWith(today)) label = data.updatedFull.slice(5, 16);
+  }
+  updatedEl.textContent = "업데이트 " + label;
   if (data.live) {
     liveBadge.className = "badge live";
     liveBadge.textContent = "실시간";
   } else {
-    // 스냅숏 데이터가 몇 분 지났는지 표시 (기기 시간 기준)
+    // 스냅숏 데이터가 얼마나 지났는지 표시 (기기 시간 기준)
     let ageMin = 0;
     if (data.updatedFull) {
       const t = new Date(data.updatedFull.replace(" ", "T")).getTime();
@@ -336,7 +355,9 @@ function apply(data) {
       liveBadge.textContent = "준실시간";
     } else {
       liveBadge.className = "badge delay";
-      liveBadge.textContent = `지연 ${ageMin}분`;
+      liveBadge.textContent = ageMin >= 90
+        ? `지연 ${Math.round(ageMin / 60)}시간`
+        : `지연 ${ageMin}분`;
     }
   }
   if (data.kospi && data.kospi.value) {
@@ -694,10 +715,18 @@ async function refresh() {
 
 function tick() {
   if (paused || document.hidden) return;
+  // 감시: 타이머가 절전 등으로 멈췄다 재개되어 데이터가 오래됐으면 즉시 갱신
+  const interval = Number(intervalSel.value);
+  if (lastData && lastData.fetchedAt && Date.now() - lastData.fetchedAt > interval * 3000) {
+    lastData.fetchedAt = Date.now();  // 중복 트리거 방지
+    remain = interval;
+    refresh();
+    return;
+  }
   remain -= 1;
   countdownEl.textContent = remain + "s";
   if (remain <= 0) {
-    remain = Number(intervalSel.value);
+    remain = interval;
     refresh();
   }
 }
@@ -710,6 +739,13 @@ pauseBtn.addEventListener("click", () => {
 });
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && lastData) refresh();  // 화면 복귀 시 즉시 갱신
+});
+// 인앱 브라우저가 저장된 화면을 복원하거나(bfcache) 앱 전환 후 돌아왔을 때도 갱신
+window.addEventListener("pageshow", ev => {
+  if (ev.persisted && lastData) refresh();
+});
+window.addEventListener("focus", () => {
+  if (lastData && lastData.fetchedAt && Date.now() - lastData.fetchedAt > 60000) refresh();
 });
 
 let resizeTimer = null;

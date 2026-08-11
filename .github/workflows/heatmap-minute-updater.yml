@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 70
     permissions:
       contents: write
+      actions: write   # 다음 실행 자체 예약(self-chain)용
     steps:
       - uses: actions/checkout@v4
 
@@ -56,3 +57,20 @@ jobs:
             fi
             sleep 50
           done
+
+      # cron 지연/누락과 무관하게 장중에는 끊기지 않도록 스스로 다음 실행을 예약
+      - name: Chain next run during market hours
+        if: always()
+        run: |
+          hhmm=$(TZ=Asia/Seoul date +%H%M)
+          dow=$(TZ=Asia/Seoul date +%u)
+          if [ "$dow" -le 5 ] && [ "$hhmm" -ge 0750 ] && [ "$hhmm" -le 2000 ]; then
+            curl -s -o /dev/null -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/heatmap-minute-updater.yml/dispatches" \
+              -d '{"ref":"main"}'
+            echo "next run dispatched"
+          else
+            echo "outside market hours, no chain"
+          fi
