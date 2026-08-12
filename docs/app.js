@@ -754,5 +754,24 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(render, 120);
 });
 
+/* ---------- 앱 설치 버튼 (Chrome 등 설치 지원 브라우저) ---------- */
+const installBtn = document.getElementById("installBtn");
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", ev => {
+  ev.preventDefault();
+  installPrompt = ev;
+  installBtn.style.display = "inline-block";
+});
+installBtn.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  installBtn.style.display = "none";
+});
+window.addEventListener("appinstalled", () => {
+  installBtn.style.display = "none";
+});
+
 refresh();
 setInterval(tick, 1000);

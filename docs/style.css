@@ -16,6 +16,40 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+#escapeBanner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  background: #1d3a25;
+  color: #cfe8d4;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+#escapeBanner a {
+  background: #8fe89b;
+  color: #0b120d;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+#installBtn {
+  display: none;
+  background: #1d3a25;
+  color: #8fe89b;
+  border: 1px solid #2f5238;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
 header {
   display: flex;
   align-items: center;

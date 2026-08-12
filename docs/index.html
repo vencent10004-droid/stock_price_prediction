@@ -10,9 +10,43 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>코스피·코스닥 실시간 히트맵</title>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
+<script>
+/* 카카오톡 등 인앱 브라우저에서 열리면 외부 브라우저(크롬)로 이동 — 앱 설치가 가능하도록 */
+(function () {
+  var ua = navigator.userAgent.toLowerCase();
+  var standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+  if (standalone) return;                      // 이미 설치된 앱으로 실행 중
+  var here = location.href.split("#")[0];
+  if (ua.indexOf("kakaotalk") !== -1) {
+    // 카카오톡 인앱 브라우저: 외부 브라우저로 자동 이동
+    location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(here);
+    return;
+  }
+  // 기타 인앱 브라우저(네이버/라인/인스타그램/페이스북 등): 안내 배너 표시
+  if (/naver|line\/|instagram|fbav|fban|daumapps|everytimeapp|whatsapp|snapchat/.test(ua)) {
+    document.addEventListener("DOMContentLoaded", function () {
+      var b = document.getElementById("escapeBanner");
+      if (!b) return;
+      b.style.display = "flex";
+      var a = document.getElementById("escapeLink");
+      if (/android/.test(ua)) {
+        a.href = "intent://" + location.host + location.pathname + location.search +
+                 "#Intent;scheme=https;package=com.android.chrome;end";
+      } else {
+        a.href = here;   // iOS는 길게 눌러 사파리로 열기 안내
+        a.textContent = "링크를 길게 눌러 Safari로 여세요";
+      }
+    });
+  }
+})();
+</script>
 </head>
 <body>
+  <div id="escapeBanner">
+    <span>앱으로 설치하려면 외부 브라우저에서 여세요</span>
+    <a id="escapeLink" href="#">Chrome으로 열기</a>
+  </div>
   <header>
     <div class="brand">KRX<span>MAP</span></div>
     <div id="marketSeg" class="seg">
@@ -25,6 +59,7 @@
     </div>
     <div class="kospi-chip" id="kospiChip"></div>
     <div class="spacer"></div>
+    <button id="installBtn">📲 앱 설치</button>
     <div class="status">
       <span id="liveBadge" class="badge"></span>
       <span id="updatedAt"></span>
@@ -60,7 +95,7 @@
     <a id="shLink" target="_blank" rel="noopener">네이버 증권에서 보기 →</a>
   </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => { /* 미지원 환경 무시 */ });
