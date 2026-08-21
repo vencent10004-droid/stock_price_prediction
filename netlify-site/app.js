@@ -103,7 +103,8 @@ let modeAutoSet = false;    // 최초 데이터 기준 자동 선택은 한 번�
 const modeSeg = document.getElementById("modeSeg");
 
 function rateOf(s) {
-  if (viewMode === "over") return (s.ov && s.ov.price > 0) ? s.ov.rate : 0;
+  // 시간외 뷰: 시간외 체결이 없는 종목은 정규장 등락률로 표시 (둘 다 전일 종가 대비)
+  if (viewMode === "over") return (s.ov && s.ov.price > 0) ? s.ov.rate : s.rate;
   return s.rate;
 }
 
@@ -331,10 +332,14 @@ function apply(data) {
   const withOv = data.stocks.find(s => s.ov && s.ov.session);
   const overBtn = modeSeg.querySelector('button[data-mode="over"]');
   if (withOv) overBtn.textContent = sessionLabel(withOv.ov.session);
-  // 첫 로드 시 시간외 거래가 진행 중이면 자동으로 시간외 보기
+  // 첫 로드 시 프리마켓/애프터마켓이 진행 중이면 자동으로 시간외 보기
+  // (정규장 중 NXT 병행 거래는 OPEN이어도 정규장 뷰 유지)
   if (!modeAutoSet) {
     modeAutoSet = true;
-    if (data.stocks.some(s => s.ov && s.ov.status === "OPEN")) setMode("over");
+    if (data.stocks.some(s => s.ov && s.ov.status === "OPEN" &&
+        (s.ov.session === "PRE_MARKET" || s.ov.session === "AFTER_MARKET"))) {
+      setMode("over");
+    }
   }
   // 오늘 데이터가 아니면 날짜까지 표시해서 혼동 방지
   let label = data.updated;
