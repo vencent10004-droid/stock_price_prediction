@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-KOSPI 시가총액 상위 100종목 — 외국인/기관 매매동향 대시보드 자동 업데이트
+KOSPI 상위 400 + KOSDAQ 상위 100 종목 — 외국인/기관 매매동향 대시보드 자동 업데이트
 
 데이터 출처 : 네이버 증권 (m.stock.naver.com 비공식 API)
 동작 방식   :
+  - 시가총액 상위 기업(ETF 제외) — KOSPI 400개, KOSDAQ 100개
   - 실행 시점 기준 최근 14일(2주) 롤링 윈도우 → 매일 실행하면 시작일/종료일이 자동으로 하루씩 이동
   - 종목별 일별 외국인/기관 순매매량 + 종가 수집
   - 순매매금액(추정) = 순매매량 x 당일 종가
   - 결과를 data.json 저장 후 template.html 에 주입하여 dashboard.html 생성
 
 실행       : python update_dashboard.py
-자동 실행  : Windows 작업 스케줄러 "KOSPI100_Dashboard" (매일 18:30)
+자동 실행  : GitHub Actions (평일 KST 18:30) + Windows 작업 스케줄러 "KOSPI100_Dashboard"
 """
 import datetime
 import json
@@ -22,8 +23,8 @@ import requests
 
 BASE = pathlib.Path(__file__).resolve().parent
 WINDOW_DAYS = 14          # 롤링 윈도우 (달력일 기준 2주)
-TOP_N = 100               # 시가총액 상위 종목 수
-REQUEST_DELAY = 0.15      # 요청 간 지연 (초)
+MARKETS = [("KOSPI", 400), ("KOSDAQ", 100)]   # (시장, 시총 상위 기업 수) — ETF 제외
+REQUEST_DELAY = 0.12      # 요청 간 지연 (초)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -55,12 +56,21 @@ def num(s):
         return 0
 
 
-def fetch_top100():
-    url = f"https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=1&pageSize={TOP_N}"
-    data = get_json(url)
-    if not data or "stocks" not in data:
-        raise RuntimeError("시가총액 상위 종목 목록을 가져오지 못했습니다.")
-    return data["stocks"][:TOP_N]
+def fetch_top(market, n):
+    """시가총액 상위 n개 기업 (ETF/ETN 제외)."""
+    picked, page = [], 1
+    while len(picked) < n and page <= 15:
+        url = f"https://m.stock.naver.com/api/stocks/marketValue/{market}?page={page}&pageSize=100"
+        data = get_json(url)
+        batch = (data or {}).get("stocks", [])
+        if not batch:
+            break
+        picked += [s for s in batch if s.get("stockEndType") == "stock"]
+        page += 1
+        time.sleep(REQUEST_DELAY)
+    if not picked:
+        raise RuntimeError(f"{market} 시가총액 상위 종목 목록을 가져오지 못했습니다.")
+    return picked[:n]
 
 
 def fetch_trend(code, start_str):
@@ -95,12 +105,18 @@ def main():
     print(f"[{datetime.datetime.now():%Y-%m-%d %H:%M:%S}] 수집 시작 "
           f"(기간 {start} ~ {today})")
 
-    top = fetch_top100()
+    targets = []
+    for market, n in MARKETS:
+        top = fetch_top(market, n)
+        print(f"  {market} 상위 {len(top)}개 기업 목록 확보")
+        for rank, s in enumerate(top, 1):
+            targets.append((market, rank, s))
+
     all_dates = set()
     stocks = []
     failed = []
 
-    for i, s in enumerate(top, 1):
+    for i, (market, rank, s) in enumerate(targets, 1):
         code = s.get("itemCode")
         name = s.get("stockName", code)
         days = fetch_trend(code, start_str)
@@ -108,14 +124,15 @@ def main():
             failed.append(f"{name}({code})")
         all_dates.update(days.keys())
         stocks.append({
-            "rank": i,
+            "rank": rank,
+            "market": market,
             "code": code,
             "name": name,
             "mcap": s.get("marketValueHangeul", ""),
             "days": days,
         })
-        if i % 20 == 0:
-            print(f"  ... {i}/{len(top)} 종목 수집")
+        if i % 50 == 0:
+            print(f"  ... {i}/{len(targets)} 종목 수집")
         time.sleep(REQUEST_DELAY)
 
     data = {
