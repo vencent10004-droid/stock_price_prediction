@@ -140,6 +140,9 @@
     display: inline-block; font-size: 9px; font-weight: 700; color: var(--surface);
     background: var(--muted); border-radius: 4px; padding: 1px 4px; margin-left: 5px; vertical-align: 1.5px;
   }
+  td.namecol a { color: inherit; text-decoration: none; }
+  td.namecol a:hover b { text-decoration: underline; color: var(--accent); }
+  .nlink { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 11.5px; white-space: nowrap; }
   th.grp, td.grp { border-left: 1px solid var(--grid); }
   td.sumcol { font-weight: 700; }
   tbody tr:hover td { filter: brightness(0.96); }
@@ -225,6 +228,7 @@
     <div class="seg" id="segMet">
       <button data-v="v" class="on">순매매금액 (억원, 추정)</button>
       <button data-v="q">순매매량 (주)</button>
+      <button data-v="c">등락률 (%)</button>
     </div>
     <select id="daySel" class="daysel"></select>
     <input type="search" id="search" placeholder="종목명·코드 검색">
@@ -262,6 +266,7 @@ const state = { met: "v", search: "", sortKey: "rank", sortDir: 1, day: null, mk
 DATA.stocks.forEach((s, i) => { s.gi = i; });
 function visible() { return state.mkt === "ALL" ? DATA.stocks : DATA.stocks.filter(s => s.market === state.mkt); }
 function badge(st) { return st.market === "KOSDAQ" ? '<span class="mk">KQ</span>' : ""; }
+function naverUrl(st) { return `https://m.stock.naver.com/domestic/stock/${st.code}/total`; }
 const WD = ["일","월","화","수","목","금","토"];
 const INV = [{ k: "f", name: "외국인", short: "외국인" }, { k: "o", name: "기관", short: "기관" }];
 const mqMobile = matchMedia("(max-width: 768px)");
@@ -275,13 +280,20 @@ function comma(n) { return (Math.round(n) || 0).toLocaleString("ko-KR"); }
 function cellVal(st, bd, inv) {
   const d = st.days[bd];
   if (!d) return null;
+  if (state.met === "c") return d.chg ?? null;   // 등락률(%) — 투자자 구분 없음
   return d[inv + state.met];          // fv | fq | ov | oq
 }
 function sumOf(st, inv) {
+  if (state.met === "c") {            // 기간 누적 수익률 (%)
+    let p = 1, has = false;
+    for (const bd of DATA.dates) { const d = st.days[bd]; if (d && d.chg != null) { p *= 1 + d.chg / 100; has = true; } }
+    return has ? (p - 1) * 100 : null;
+  }
   let s = 0, has = false;
   for (const bd of DATA.dates) { const v = cellVal(st, bd, inv); if (v !== null) { s += v; has = true; } }
   return has ? s : null;
 }
+function fmtVal(v) { return state.met === "c" ? (v > 0 ? "+" : "") + v.toFixed(2) : comma(v); }
 
 /* ---------- 헤더/메타 ---------- */
 document.getElementById("period").textContent =
@@ -353,8 +365,10 @@ function renderRank() {
 function heatMax() {
   const vals = [];
   for (const st of visible())
-    for (const bd of DATA.dates)
-      for (const { k } of INV) { const v = cellVal(st, bd, k); if (v !== null && v !== 0) vals.push(Math.abs(v)); }
+    for (const bd of DATA.dates) {
+      if (state.met === "c") { const v = cellVal(st, bd, "f"); if (v) vals.push(Math.abs(v)); }
+      else for (const { k } of INV) { const v = cellVal(st, bd, k); if (v !== null && v !== 0) vals.push(Math.abs(v)); }
+    }
   if (!vals.length) return 1;
   vals.sort((a, b) => a - b);
   return vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1];
@@ -364,15 +378,20 @@ function renderTableDesktop() {
   const vmax = heatMax();
   const arrow = k => state.sortKey === k ? ` <span class="arrow">${state.sortDir < 0 ? "▼" : "▲"}</span>` : "";
 
-  // 헤더 1행: 날짜 (colspan 2), 2행: 외국인/기관
+  // 헤더 1행: 날짜 (colspan 2), 2행: 외국인/기관 — 등락률 모드는 날짜당 1열
   let h1 = `<th class="namecol" rowspan="2" data-k="rank">종목${arrow("rank")}</th>`;
   let h2 = "";
-  for (const bd of DATA.dates) {
-    h1 += `<th colspan="2" class="grp">${fdate(bd, true)}</th>`;
-    h2 += `<th class="grp" data-k="${bd}_f">외국인${arrow(bd + "_f")}</th><th data-k="${bd}_o">기관${arrow(bd + "_o")}</th>`;
+  if (state.met === "c") {
+    for (const bd of DATA.dates) h1 += `<th class="grp" rowspan="2" data-k="${bd}_f">${fdate(bd, true)}${arrow(bd + "_f")}</th>`;
+    h1 += `<th class="grp" rowspan="2" data-k="sum_f">기간 수익률${arrow("sum_f")}</th>`;
+  } else {
+    for (const bd of DATA.dates) {
+      h1 += `<th colspan="2" class="grp">${fdate(bd, true)}</th>`;
+      h2 += `<th class="grp" data-k="${bd}_f">외국인${arrow(bd + "_f")}</th><th data-k="${bd}_o">기관${arrow(bd + "_o")}</th>`;
+    }
+    h1 += `<th colspan="2" class="grp">2주 합계</th>`;
+    h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
   }
-  h1 += `<th colspan="2" class="grp">2주 합계</th>`;
-  h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
   document.getElementById("headRow1").innerHTML = h1;
   document.getElementById("headRow2").innerHTML = h2;
 
@@ -398,17 +417,22 @@ function renderTableDesktop() {
     if (v === null) return `<td class="empty ${cls}">–</td>`;
     const a = Math.min(1, Math.abs(v) / vmax) * 0.55;
     const bg = v > 0 ? `rgba(var(--buy-rgb),${a.toFixed(3)})` : v < 0 ? `rgba(var(--sell-rgb),${a.toFixed(3)})` : "transparent";
-    return `<td class="${cls}" data-c="${st.code}" data-d="${bd}" style="background:${bg}">${comma(v)}</td>`;
+    return `<td class="${cls}" data-c="${st.code}" data-d="${bd}" style="background:${bg}">${fmtVal(v)}</td>`;
   };
   const frag = [];
   for (const { st, sumF, sumO } of rows) {
-    let tr = `<tr><td class="namecol"><span class="rk">${st.rank}</span><b>${st.name}</b>${badge(st)}<span class="cd">${st.code}</span></td>`;
-    for (const bd of DATA.dates) {
-      tr += cell(st, bd, "f", "grp");
-      tr += cell(st, bd, "o", "");
+    let tr = `<tr><td class="namecol"><span class="rk">${st.rank}</span><a href="${naverUrl(st)}" target="_blank" rel="noopener" title="네이버 증권에서 자세히 보기"><b>${st.name}</b></a>${badge(st)}<span class="cd">${st.code}</span></td>`;
+    if (state.met === "c") {
+      for (const bd of DATA.dates) tr += cell(st, bd, "f", "grp");
+      tr += `<td class="sumcol grp">${sumF === null ? "–" : fmtVal(sumF)}</td></tr>`;
+    } else {
+      for (const bd of DATA.dates) {
+        tr += cell(st, bd, "f", "grp");
+        tr += cell(st, bd, "o", "");
+      }
+      tr += `<td class="sumcol grp">${sumF === null ? "–" : fmtVal(sumF)}</td>`;
+      tr += `<td class="sumcol">${sumO === null ? "–" : fmtVal(sumO)}</td></tr>`;
     }
-    tr += `<td class="sumcol grp">${sumF === null ? "–" : comma(sumF)}</td>`;
-    tr += `<td class="sumcol">${sumO === null ? "–" : comma(sumO)}</td></tr>`;
     frag.push(tr);
   }
   document.getElementById("body").innerHTML = frag.join("");
@@ -421,15 +445,33 @@ function cellTint(v, vmax) {
   return v > 0 ? `background:rgba(var(--buy-rgb),${a.toFixed(3)})` : `background:rgba(var(--sell-rgb),${a.toFixed(3)})`;
 }
 
+function pct95(getter) {
+  const vals = [];
+  for (const st of visible()) for (const bd of DATA.dates) {
+    const d = st.days[bd]; if (!d) continue;
+    const v = getter(d); if (v) vals.push(Math.abs(v));
+  }
+  if (!vals.length) return 1;
+  vals.sort((a, b) => a - b);
+  return vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1];
+}
+function fmtChg(v) { return v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2) + "%"; }
+
 function renderTableMobile() {
   const vmax = heatMax();
   const day = state.day || DATA.dates[DATA.dates.length - 1];
   const arrow = k => state.sortKey === k ? ` <span class="arrow">${state.sortDir < 0 ? "▼" : "▲"}</span>` : "";
 
   let h1 = `<th class="namecol" rowspan="2" data-k="rank">종목${arrow("rank")}</th>`;
-  h1 += `<th colspan="2" class="grp">${fdate(day, true)}</th><th colspan="2" class="grp">2주 합계</th>`;
-  let h2 = `<th class="grp" data-k="${day}_f">외국인${arrow(day + "_f")}</th><th data-k="${day}_o">기관${arrow(day + "_o")}</th>`;
-  h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
+  let h2 = "";
+  if (state.met === "c") {
+    h1 += `<th class="grp" rowspan="2" data-k="${day}_f">${fdate(day, true)}${arrow(day + "_f")}</th>`;
+    h1 += `<th class="grp" rowspan="2" data-k="sum_f">기간 수익률${arrow("sum_f")}</th>`;
+  } else {
+    h1 += `<th colspan="2" class="grp">${fdate(day, true)}</th><th colspan="2" class="grp">2주 합계</th>`;
+    h2 = `<th class="grp" data-k="${day}_f">외국인${arrow(day + "_f")}</th><th data-k="${day}_o">기관${arrow(day + "_o")}</th>`;
+    h2 += `<th class="grp" data-k="sum_f">외국인${arrow("sum_f")}</th><th data-k="sum_o">기관${arrow("sum_o")}</th>`;
+  }
   document.getElementById("headRow1").innerHTML = h1;
   document.getElementById("headRow2").innerHTML = h2;
 
@@ -448,12 +490,16 @@ function renderTableMobile() {
     return (av - bv) * state.sortDir;
   });
 
-  const cellHtml = (v, cls) => v === null ? `<td class="empty ${cls}">–</td>` : `<td class="${cls}" style="${cellTint(v, vmax)}">${comma(v)}</td>`;
+  const cellHtml = (v, cls) => v === null ? `<td class="empty ${cls}">–</td>` : `<td class="${cls}" style="${cellTint(v, vmax)}">${fmtVal(v)}</td>`;
   const frag = [];
   for (const { st, sumF, sumO } of rows) {
     let tr = `<tr class="mrow" data-code="${st.code}"><td class="namecol"><span class="rk">${st.rank}</span><b>${st.name}</b>${badge(st)}</td>`;
-    tr += cellHtml(cellVal(st, day, "f"), "grp") + cellHtml(cellVal(st, day, "o"), "");
-    tr += cellHtml(sumF, "grp") + cellHtml(sumO, "") + `</tr>`;
+    if (state.met === "c") {
+      tr += cellHtml(cellVal(st, day, "f"), "grp") + cellHtml(sumF, "grp") + `</tr>`;
+    } else {
+      tr += cellHtml(cellVal(st, day, "f"), "grp") + cellHtml(cellVal(st, day, "o"), "");
+      tr += cellHtml(sumF, "grp") + cellHtml(sumO, "") + `</tr>`;
+    }
     frag.push(tr);
   }
   document.getElementById("body").innerHTML = frag.join("");
@@ -502,25 +548,29 @@ daySel.addEventListener("change", () => { state.day = daySel.value; state.sortKe
 mqMobile.addEventListener("change", renderTable);
 
 document.getElementById("body").addEventListener("click", e => {
+  if (e.target.closest("a")) return;                 // 링크 클릭은 그대로 통과
   if (!mqMobile.matches) return;
   const tr = e.target.closest("tr.mrow"); if (!tr) return;
   const next = tr.nextElementSibling;
   if (next && next.classList.contains("detail")) { next.remove(); return; }
   document.querySelectorAll("#body tr.detail").forEach(x => x.remove());
   const st = DATA.stocks.find(s => s.code === tr.dataset.code);
-  const vmax = heatMax();
-  const unit = state.met === "v" ? "억원" : "주";
+  const m = state.met === "c" ? "v" : state.met;          // 투자자 열은 금액/수량
+  const unit = m === "v" ? "억원" : "주";
+  const mvmax = Math.max(pct95(d => d["f" + m]), pct95(d => d["o" + m]));
+  const cvmax = pct95(d => d.chg);
   let rows = "";
   for (const bd of [...DATA.dates].reverse()) {
     const d = st.days[bd];
-    if (!d) { rows += `<tr><td>${fdate(bd, true)}</td><td>–</td><td>–</td></tr>`; continue; }
-    const f = d["f" + state.met], o = d["o" + state.met];
-    rows += `<tr><td>${fdate(bd, true)}</td><td style="${cellTint(f, vmax)}">${comma(f)}</td><td style="${cellTint(o, vmax)}">${comma(o)}</td></tr>`;
+    if (!d) { rows += `<tr><td>${fdate(bd, true)}</td><td>–</td><td>–</td><td>–</td></tr>`; continue; }
+    const f = d["f" + m], o = d["o" + m];
+    rows += `<tr><td>${fdate(bd, true)}</td><td style="${cellTint(d.chg, cvmax)}">${fmtChg(d.chg)}</td><td style="${cellTint(f, mvmax)}">${comma(f)}</td><td style="${cellTint(o, mvmax)}">${comma(o)}</td></tr>`;
   }
   const det = document.createElement("tr");
   det.className = "detail";
-  det.innerHTML = `<td colspan="5" class="detailcell"><table class="detail-tbl">
-    <tr><th>${st.name} · 일별 (${unit})</th><th>외국인</th><th>기관</th></tr>${rows}</table></td>`;
+  const cols = state.met === "c" ? 3 : 5;
+  det.innerHTML = `<td colspan="${cols}" class="detailcell"><table class="detail-tbl">
+    <tr><th>${st.name} (${unit}) · <a class="nlink" href="${naverUrl(st)}" target="_blank" rel="noopener">네이버 증권 ↗</a></th><th>등락률</th><th>외국인</th><th>기관</th></tr>${rows}</table></td>`;
   tr.after(det);
 });
 
@@ -534,6 +584,7 @@ document.getElementById("body").addEventListener("mousemove", e => {
   tip.innerHTML = `
     <div class="t-title">${st.name} · ${fdate(td.dataset.d, true)}</div>
     <div class="t-row"><span>종가</span><span class="num">${comma(d.close)} 원</span></div>
+    <div class="t-row"><span>등락률</span><span class="num">${fmtChg(d.chg)}</span></div>
     <div class="t-row"><span>외국인 순매매량</span><span class="num">${comma(d.fq)} 주</span></div>
     <div class="t-row"><span>외국인 순매매금액</span><span class="num">${comma(d.fv)} 억원</span></div>
     <div class="t-row"><span>기관 순매매량</span><span class="num">${comma(d.oq)} 주</span></div>

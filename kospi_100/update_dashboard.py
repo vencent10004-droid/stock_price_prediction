@@ -87,12 +87,16 @@ def fetch_trend(code, start_str):
         fq = num(row.get("foreignerPureBuyQuant"))
         oq = num(row.get("organPureBuyQuant"))
         close = num(row.get("closePrice"))
+        diff = num(row.get("compareToPreviousClosePrice"))
+        prev = close - diff
+        chg = round(diff / prev * 100, 2) if prev else 0.0
         days[bd] = {
             "fq": fq,                              # 외국인 순매매량 (주)
             "oq": oq,                              # 기관 순매매량 (주)
             "fv": round(fq * close / 1e8, 1),      # 외국인 순매매금액 추정 (억원)
             "ov": round(oq * close / 1e8, 1),      # 기관 순매매금액 추정 (억원)
             "close": close,
+            "chg": chg,                            # 일별 주가 등락률 (%)
         }
     return days
 
